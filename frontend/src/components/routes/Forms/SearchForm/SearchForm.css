@@ -1,0 +1,203 @@
+/* src/components/routes/Forms/SearchForm/SearchForm.css */
+
+
+.list-containerr {
+    display: flex; /* Use flexbox */
+    flex-direction: column; /* Stack children vertically */
+    overflow-y: auto;
+    height: auto;
+    background-color: #f9f9f9;
+    border-radius: 5px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    margin: auto;
+    width: 95%;
+    text-align: left;
+    transition: all 0.3s ease-in-out;
+  }
+
+.list_form_headiiii {
+    color: #364C63;
+    text-align: center;
+    font-size: 1.25rem;
+    font-weight: bold;
+    letter-spacing: 0.05rem;
+    margin-bottom: 2rem;
+    margin-top: 1rem;
+}
+
+.list_form_ull {
+    list-style-type: none;
+    padding: 0;
+    margin: 1rem;
+    font-size: 1rem;
+    /* width: 100%; */
+    box-sizing: border-box;
+}
+
+/* Add this for aligning <p> elements in two columns */
+.customer-detailss p {
+    width: 48%; 
+    margin-bottom: 0.5rem; 
+    color: #364C63;
+}
+
+
+.customer-detailss {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start; /* Aligns items to the top */
+    text-align: left; /* Makes sure all text is left-aligned */
+}
+
+/* Small margin adjustment for odd and even elements */
+.customer-detailss p:nth-child(odd) {
+    margin-right: 2%;
+}
+
+.customer-detailss p:nth-child(even) {
+    margin-left: 0;
+}
+
+.edit-btn{
+    margin: auto;
+    border: none;
+    border-radius: 10px;
+    background-color: #EF6F53;
+    color: white;
+    font-size: 0.9em;
+    padding:0.25rem;
+    width: 5vw;
+    line-height: 1rem;
+    margin-top: 1rem;
+    margin-bottom: 3rem;
+}
+
+
+.add-home-btn {
+    display: flex;
+    width: 8vw;
+    background-color: #EF6F53;
+    color: white;
+    border: none;
+    padding: 0.25rem;
+    font-size: 0.75rem;
+    border-radius: 5px;
+    cursor: pointer;
+    margin: auto;
+    align-items:center ;
+    justify-content: center;
+    margin-top: 5rem;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+  
+.add-home-btn:hover{
+    background-color: #f8360b;
+    transform: translateY(2px); 
+}
+
+.bulk-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 1rem 2.5rem;
+    background-color: #ffffff;
+    margin-bottom: 1rem;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.team-assignment-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #ffffff;
+  border-radius: 5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.team-user-select {
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  min-width: 200px;
+  font-size: 0.9rem;
+  color: #364C63;
+}
+
+.assign-team-btn {
+  padding: 0.5rem 1rem;
+  background-color: #EF6F53;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.3s ease;
+}
+
+.assign-team-btn:hover {
+  background-color: #f8360b;
+}
+
+.assign-team-btn:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.pagination-containerr {
+  background-color: #364C63;
+  padding: 0.5rem; 
+  border-top: 2px solid #EF6F53; 
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.paginationn {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.page-numberr {
+  padding: 0.25rem;
+  border: 1px solid #ddd;
+  background-color: white;
+  color: #364C63;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  font-size: 0.8rem;
+}
+
+.page-numberr:hover {
+  background-color: #f5f5f5;
+}
+
+.page-numberr.active {
+  background-color: #EF6F53;
+  color: white;
+  border-color: #EF6F53;
+}
+
+.ellipsiss {
+  padding: 0.5rem;
+  color: #364C63;
+}
+
+.customers-table input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  margin: 0;
+  vertical-align: middle;
+}
+
+.customers-table td:first-child,
+.customers-table th:first-child {
+  width: 40px;
+  text-align: center;
+  padding: 0.5rem;
+}

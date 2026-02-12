@@ -1,0 +1,146 @@
+/* src/components/routes/Sign/Login/Login.css */
+
+
+.login-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 75vh;
+    background-color: white;
+    border-radius: 10px;
+    padding: 2rem;
+}
+
+.login-headi {
+    color: #364C63;
+    text-align: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+    letter-spacing: 0.05rem;
+    margin-bottom: 1rem;
+    margin-top: 1rem;
+}
+
+.login-left {
+    width: 30%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 1rem;
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+}
+
+.login-left form {
+    display: flex;
+    flex-direction: column;
+    width: 80%;
+    margin: auto;
+}
+
+.login-left label {
+    font-size: 1rem;
+    color: #364C63;
+    margin-bottom: 0.25rem;
+}
+
+.lockout-message {
+    background-color: #ffeaea;
+    color: #d32f2f;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 4px;
+    text-align: center;
+    font-weight: 500;
+}
+
+.input-locked {
+    background-color: #f5f5f5;
+    cursor: not-allowed;
+}
+
+.login-left input {
+    padding: 0.25rem;
+    font-size: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    margin-bottom: 1rem;
+    outline: none;
+}
+
+.login-left input:focus {
+    border-color: #EF6F53;
+}
+
+.login-left button {
+    background-color: #EF6F53;
+    color: white;
+    border: none;
+    width: 30%;
+    margin: auto;
+    padding: 0.25rem;
+    font-size: 1rem;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.login-left button:hover {
+    background-color: #d15846;
+}
+
+.regis{
+    display: flex;
+    margin: auto;
+}
+
+.head2 {
+    color: #364C63;
+    text-align: center;
+    font-size: 0.9rem;
+    margin-top: 0.75rem;
+    margin-right: 0.5rem;
+}
+
+.register-link {
+    display: inline-block;
+    margin-top: 0.5rem;
+    color: #EF6F53;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+.register-link:hover {
+    text-decoration: underline;
+}
+
+.forgot-password-link {
+    text-align: center;
+    margin-top: 15px;
+}
+
+.forgot-password-link a {
+    color: #007bff;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 1rem;
+}
+
+.forgot-password-link a:hover {
+    text-decoration: underline;
+}
+
+.login-right {
+    width: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.sign-icon {
+    width: 80%;
+    max-width: 25rem;
+    border-radius: 5px;
+    margin-left: 30%;
+}

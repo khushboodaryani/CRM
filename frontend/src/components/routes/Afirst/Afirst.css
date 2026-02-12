@@ -1,0 +1,38 @@
+/* src/components/routes/Afirst/Afirst.css */
+
+.everything{
+    background-color: white;
+    overflow-y: auto;
+}
+
+.main-first{
+    position: relative;
+    padding: 0;
+    margin: 0;
+    height:13vh;
+}
+
+.main-second{
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    padding: 0;
+    margin: 0;
+    height: 85vh;
+}
+
+/* 
+.second-sidebar{
+    width: 25%;
+    padding: 0;
+    margin: 0;
+    border-right:0.5px solid;
+    border-color: rgb(212, 212, 212);
+
+} */
+
+.second-form{
+    width: 100%;
+    padding: 0;
+    margin: 0;
+}

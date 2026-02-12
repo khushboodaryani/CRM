@@ -1,0 +1,199 @@
+/* src/components/routes/Sign/Register/Register.css */
+
+
+.register-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 75vh;
+    background-color: white;
+    border-radius: 10px;
+    padding: 2rem;
+}
+
+.register-headi {
+    color: #364C63;
+    text-align: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+    letter-spacing: 0.05rem;
+    margin-bottom: 1rem;
+    margin-top: 1rem;
+}
+
+.register-left {
+    width: 30%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 1rem;
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+}
+
+.register-left form {
+    display: flex;
+    flex-direction: column;
+    width: 80%;
+    margin: auto;
+}
+
+.register-left label {
+    font-size: 1rem;
+    color: #364C63;
+    margin-bottom: 0.25rem;
+    /* text-align: left; */
+}
+
+.register-left input {
+    padding: 0.25rem;
+    font-size: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    margin-bottom: 1rem;
+    outline: none;
+}
+
+.register-left input:focus {
+    border-color: #EF6F53;
+}
+
+.register-left select{
+    font-size: 1rem;
+    width: 100%; 
+    background-color: white;
+    color: #323232;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    text-align: center;
+    padding: 0.25rem;
+}
+
+
+.register-left button {
+    background-color: #EF6F53;
+    color: white;
+    border: none;
+    width: 30%;
+    margin: auto;
+    margin-top: 1rem;
+    padding: 0.25rem;
+    font-size: 1rem;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.register-left button:hover {
+    background-color: #d15846;
+}
+
+.logis{
+    display: flex;
+    margin: auto;
+}
+
+.head2 {
+    color: #364C63;
+    text-align: center;
+    font-size: 0.9rem;
+    margin-top: 0.75rem;
+    margin-right: 0.5rem;
+}
+
+.login-link {
+    display: inline-block;
+    margin-top: 0.5rem;
+    color: #EF6F53;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+.login-link:hover {
+    text-decoration: underline;
+}
+
+
+
+.register-right {
+    width: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.register-icon {
+    width: 80%;
+    max-width: 25rem;
+    border-radius: 5px;
+    margin-left: 30%;
+}
+
+.pending-approval{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    margin-top: 2rem;
+}
+
+.pending-heading{
+    color: #EF6F53;
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+}
+
+.pending-text{
+    color: #364C63;
+    font-size: 1rem;
+}
+
+.alert {
+    padding: 12px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.alert-error {
+    background-color: #ffebee;
+    color: #c62828;
+    border: 1px solid #ffcdd2;
+}
+
+.alert-success {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #c8e6c9;
+}
+
+.button-registering {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* Add loading animation */
+.button-registering::after {
+    content: '';
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    margin-left: 10px;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }   
+}

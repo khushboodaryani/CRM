@@ -1,0 +1,223 @@
+/* src/components/routes/Other/Header/DownloadFile.css */
+
+.download-page {
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    margin: 0 auto;
+    background-color: white;
+    overflow-y: auto;
+}
+
+.download-heading {
+    color: #EF6F53;
+    text-align: center;
+    font-size: 1.25rem;
+    font-weight: bold;
+    letter-spacing: 0.05rem;
+    margin-top: 0;
+    margin-bottom: 0;
+    padding: 0.5rem;
+    grid-column: 2;
+    text-transform: uppercase;
+}
+
+.date-picker-container {
+    width: 100%;
+    margin: auto;
+    padding: 0.5rem;
+    background-color: #f8f9fa;
+    border-radius: 10px;
+    border: 1px solid #e9ecef;
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.date-picker-wrapper {
+    margin: auto;
+    flex: 1;
+    width: 50%;
+    text-align: center;
+    align-items: center;
+    justify-content: center;
+    display: flex;
+    flex-direction: column;
+}
+
+.date-picker-wrapper label {
+    display: block;
+    color: #555;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.datetime-input {
+    width: 50%;
+    padding: 8px;
+    font-size: 0.9rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: white;
+    color: #364C63;
+    transition: border-color 0.2s ease;
+    margin-bottom: 1rem;
+    cursor: pointer;
+    display: block;
+}
+
+.datetime-input:focus {
+    outline: none;
+    border-color: #EF6F53;
+    box-shadow: 0 0 0 2px rgba(239, 111, 83, 0.2);
+}
+
+.datetime-input::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.6;
+    filter: invert(40%) sepia(8%) saturate(1058%) hue-rotate(182deg) brightness(95%) contrast(88%);
+}
+
+.datetime-input::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+}
+
+.search-container {
+    margin: auto;
+    width: 50%;
+}
+
+.search-input {
+    width: 100%;
+    padding: 2px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.3s;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
+.error-message {
+    color: #dc3545;
+    font-size: 0.875rem;
+    margin: 10px 0;
+    padding: 10px;
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 4px;
+    text-align: center;
+    width: 100%;
+}
+
+
+.data-table-container {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    height:50vh;
+    margin: auto;
+    margin-top: 10px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 600px;
+    background: white;
+}
+
+.data-table th,
+.data-table td {
+    padding:5px;
+    border: 1px solid #ddd;
+    text-align: left;
+    font-size: 0.75rem;
+}
+
+.data-table th {
+    background: #f3f3f3;
+    font-weight: bold;
+    color: #4a7aad;
+    font-weight: 600;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+}
+
+.data-table tr:nth-child(even) {
+    background: #f9f9f9;
+}
+
+.data-table tr:hover {
+    background: #f0f0f0;
+}
+
+.data-table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.data-table td {
+    color: #495057;
+}
+
+.loading-message {
+    color: #666;
+    text-align: center;
+    margin: 2rem 0;
+    font-weight: 500;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.no-data-message {
+    text-align: center;
+    padding: 0.5rem;
+    color: #666;
+    background: #f8f9fa;
+    border-radius: 4px;
+    width: 50%;
+    margin: auto;
+    text-transform: uppercase;
+}
+
+.table-info {
+    margin-top: 2px;
+    color: #4a7aad;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.download-btn {
+    background-color: #007bff;
+    color: white;
+    padding: 2px;
+    font-size: 1rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    width: 15%;
+    margin: auto;
+    margin-top: 5px;
+}
+
+.download-btn:hover:not(:disabled) {
+    background-color: #0056b3;
+}
+
+.download-btn:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+    opacity: 0.7;
+}

@@ -1,0 +1,116 @@
+/* src/components/routes/Forms/CustomForm/CustomForm.css */
+
+.custom-form-container{
+    height: 80vh;
+    overflow-y: auto;
+}
+
+.custom-headi{
+    color: #364C63;
+    text-align: center;
+    font-size: 1.25rem;
+    font-weight: bold;
+    letter-spacing: 0.05rem;
+    margin-bottom: 1rem;
+    margin-top: 0.5rem;
+}
+
+.custom-form{
+    padding: 1rem;
+    width: 80vw;
+    height: 65vh;
+    margin: auto; 
+    border-radius: 10px; 
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); 
+    overflow-y: auto;
+    margin-top: 1rem;
+    font-size: 0.75em;
+}
+
+.form-field {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+    padding: 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2); 
+    border-radius: 5px;
+    background-color: white; 
+}
+
+
+.fieldname{
+    width: 20vw;
+    border: 1px solid #ccc;
+    border-radius: 4px; 
+    margin-right:1rem;
+    width: 25%;
+}
+
+.form-field select {
+    padding: 3px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-right:1rem;
+    width: 25%;
+}
+
+.dropdown-options-container {
+    display: flex;
+    flex-direction: row; 
+    margin-top: 10px; 
+    width: 25%;
+}
+
+.dropdown-option {
+    display: flex; 
+    align-items: center;
+    margin-bottom: 5px;
+    width: 25%;
+}
+
+/* .dropdown-option input {
+    flex: 1; 
+} */
+
+.remove-field-btn,
+.add-field-btn,
+.submit-form-btn,
+.add-option-btn,
+.add-field-btnn {
+    background-color: #EF6F53;
+    color: white;
+    border: none;
+    cursor: pointer;
+    margin-left: 10px;
+    border-radius: 4px; 
+    transition: background-color 0.3s;
+}
+
+.remove-field-btn:hover,
+.add-field-btn:hover,
+.submit-form-btn:hover,
+.add-option-btn:hover,
+.add-field-btnn:hover {
+    background-color: #eb220c;
+}
+
+.customer-data {
+    margin-top: 20px;
+}
+
+.customer-data h3 {
+    text-align: center;
+}
+
+.customer-data ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+.customer-data ul li {
+    margin-bottom: 8px;
+    padding: 8px; 
+    border: 1px solid #eee; 
+    border-radius: 4px; 
+    background-color: #f1f1f1; 
+}

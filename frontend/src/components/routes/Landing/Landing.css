@@ -1,0 +1,49 @@
+/* src/components/routes/Landing/Landing.css */
+
+.landing-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: white;
+    height: 12vh;
+    padding: 2rem;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.623);
+}
+
+.logo-landing {
+    height: 3.25rem;
+}
+
+.landing-content {
+    overflow-y: auto;
+    height: 85vh;
+    justify-content: center;
+    align-items: center;
+    color: #EF6F53;
+}
+
+.landing-heading {
+    margin-top: 15%;
+    font-size: 5rem;
+    color: white;
+    font-weight: 600;
+}
+
+.continue-link { 
+    display: inline-block;
+    margin-top: 20px;
+    font-size: 1.5rem;
+    color: #364C63; 
+    color: white;
+    text-decoration: none; 
+    background-color: #d85939;
+    padding: 10px; 
+    border-radius: 10px; 
+    transition: background-color 0.3s; 
+    cursor: pointer;
+}
+
+.continue-link:hover {
+    background-color: #fa3a0a; 
+    transform: translateY(2px); 
+}

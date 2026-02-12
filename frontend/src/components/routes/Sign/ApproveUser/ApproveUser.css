@@ -1,0 +1,90 @@
+/* src/components/routes/Sign/ApproveUser/ApproveUser.css */
+
+.approve-user-container {
+    display: flex;
+    margin: auto;
+}
+
+.approve-user-card {
+    background: white;
+    padding: 30px;
+    width: 100%;
+    text-align: center;
+}
+
+.approve-user-heading {
+    color: #364C63;
+    text-align: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+    letter-spacing: 0.05rem;
+    margin-bottom: 1rem;
+    margin-top: 1rem;
+}
+
+.error-messagee {
+    background-color: #ffebee;
+    color: #c62828;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.success-messagee {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.approval-buttons {
+    margin-top: 3rem;
+}
+.approve-user-para{
+    color: #364C63;
+    text-align: center;
+    font-size: 1rem;
+    letter-spacing: 0.05rem;
+    margin-bottom: 1rem;
+    margin-top: 1rem;
+}
+
+.button-grouppp {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin-top: 2rem;
+}
+
+.approve-button {
+    background-color: #EF6F53;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    font-size: 0.85rem;
+}
+
+.reject-button {
+    background-color: #EF6F53;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    font-size: 0.85rem;
+}
+
+
+
+.approve-button:hover {
+    background-color: #43a047;
+}
+
+.reject-button:hover {
+    background-color: #e53935;
+}

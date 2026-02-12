@@ -1,0 +1,336 @@
+/* src/components/routes/Other/Header/Upload/UploadNew.css */
+
+.int-chose{
+    font-size: 0.75rem;
+    margin: 0;
+    padding: 0.25rem;
+}
+
+
+.upload_new_headiiii {
+    color: #EF6F53;
+    text-align: center;
+    font-size: 1.25rem;
+    font-weight: bold;
+    letter-spacing: 0.05rem;
+    margin: 0;
+    padding: 0.5rem;
+    grid-column: 2;
+    text-transform: uppercase;
+}
+
+/* .upload_new_headii{
+    color: #364C63;
+    text-align: center;
+    font-size: 1rem;
+    font-weight: bold;
+    letter-spacing: 0.05rem;
+    margin: 0;
+    padding: 0.5rem;
+    margin-bottom: 1rem;
+    margin-top: 1rem;
+} */
+
+.mapping-container {
+    width: 100%;
+    margin: auto;
+    height: 60vh;
+    overflow-y: auto;
+}
+
+.mapping-rows {
+    display: grid;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.mapping-row {
+    display: grid;
+    grid-template-columns: 150px 200px;
+    align-items: center;
+    gap: 10px;
+}
+
+.system-header {
+    padding: 1px 5px;
+    color: white;
+    background-color: #364C63;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    margin: 0;
+    justify-self: start;
+    font-weight: 800;
+}
+
+.file-header {
+    justify-self: start;
+}
+
+.header-select {
+    width: 150px;
+    padding: 0.75px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    font-size: 0.8rem;
+}
+
+.submitt-btnn{
+    padding: 5px 10px;
+    background-color: #EF6F53;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.submitt-btnn:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+.submitt-btnn:hover {
+    background-color: #2d6929;
+    cursor: pointer;
+}
+
+.submit-container {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+    grid-column: 1 / -1;
+}
+
+.containerr {
+    display: flex;
+    justify-content: space-between;
+    padding: 20px;
+    gap: 30px;
+}
+
+.upload-form {
+    margin: auto;
+}
+
+/* .upload-result {
+    margin-top: 3rem;
+    width: 60vw;
+    background-color: white;
+    box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    height: 60vh;
+    overflow-y: auto;
+} */
+
+.upload_res_headii {
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+    color: #EF6F53;
+}
+
+.upload_res_para {
+    margin: 10px 0;
+    font-size: 1rem;
+    color: #364C63;
+}
+
+.duplicate-records {
+    margin-top: 10px;
+}
+
+.duplicate-records-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 0.8rem;
+}
+
+.duplicate-records-table th,
+.duplicate-records-table td {
+    padding: 5px;
+    text-align: left;
+    border-bottom: 2px solid #ddd;
+}
+
+.duplicate-records-table th {
+    background-color: #2a3b4d;
+    color: white;
+    font-weight: 600;
+}
+
+.duplicate-records-table tbody tr.new-record + tr.existing-record {
+    border-bottom: 12px solid #f5f5f5;  /* Light gap between record pairs */
+}
+
+.duplicate-records-table tbody tr {
+    background-color: #fff;
+}
+
+.duplicate-records-table tbody tr.new-record {
+    background-color: #f8f9fa;
+}
+
+.duplicate-records-table tbody tr.existing-record {
+    background-color: #fff;
+}
+
+.duplicate-status-new{
+    color: green;
+    font-weight: 500;
+}
+
+.duplicate-status-existing{
+    color: #dc3545;
+    font-weight: 500;
+}
+
+.duplicate-action-select{
+    width: 100%;
+    padding: 5px;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    font-weight: 800;
+    transition: border-color 0.2s;
+    background-color: #ddd;
+    color: #EF6F53;
+    cursor: pointer;
+}
+
+.duplicate-action-select:hover {
+    background-color: #bcbcbc;
+}
+
+.error-messagee {
+    position: fixed;
+    top: 40%;
+    left: 77.5%;
+    transform: translate(-50%, -50%);
+    width: 40%;
+    padding: 20px;
+    box-shadow: 0 2px 5px rgba(11, 10, 10, 0.991);
+    z-index: 10;
+}
+
+.btn-secondaryyyy {
+    width: 22.5%;
+    margin: 1px;
+    padding: 5px ;
+    background-color: #4c739c;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+.btn-secondaryyyy:hover {
+    background-color: #2a3b4d;
+}
+
+.confirmation-buttons {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.confirmation-buttons p {
+    margin-bottom: 15px;
+    color: #666;
+}
+
+.confirmation-buttons button {
+    margin: 5px;
+    padding: 8px 10px;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.btn-success {
+    background-color: green;
+    color: white;
+}
+
+.btn-success:hover {
+    background-color: #215726;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    color: white;
+}
+
+.btn-danger:hover {
+    background-color: #c82333;
+}
+
+.butn {
+    padding: 0.25rem;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 500;
+    gap: 5px;
+    transition: all 0.3s ease;
+}
+
+.btn-secondary {
+    padding: 0.25rem;
+    background-color: #364C63;
+    color: white;
+    border: none;
+    font-size: 0.9rem;
+    margin: auto;
+}
+
+.btn-secondary:hover {
+    background-color: #2a3b4d;
+}
+
+.upload-header {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.download-sample-btn {
+    grid-column: 3;
+    justify-self: end;
+    background-color: #EF6F53;
+    color: white;
+    border: none;
+    padding: 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s;
+}
+
+.download-sample-btn:hover {
+    background-color: #df3319;
+}
+
+/* Scrollbar styling */
+/* .upload-result::-webkit-scrollbar {
+    width: 6px;
+}
+
+.upload-result::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.upload-result::-webkit-scrollbar-thumb {
+    background: #364C63;
+    border-radius: 3px;
+}
+
+.upload-result::-webkit-scrollbar-thumb:hover {
+    background: #2a3b4d;
+} */
+
+.success-text {
+    color: #28a745;
+    font-weight: bold;
+}

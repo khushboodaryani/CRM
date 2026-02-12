@@ -1,0 +1,356 @@
+/* src/components/routes/Forms/AdminPortal/AdminPortal.css */
+
+.admin-portal-container {
+    display: flex;
+    flex-direction: column;
+    background-color: #364C63;
+}
+
+.admin-portal {
+    padding: 0.5rem;
+    margin: auto;
+    flex: 1;
+    width: 100%;
+}
+
+.sectionnn {
+    background: white;
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    width: 40%;
+    display: flex;
+    margin: auto;
+    margin-bottom: 1rem;
+    flex-direction: column;
+}
+
+.admin-portal-heading {
+    color: #EF6F53  ;
+    text-align: center;
+    font-size: 1.75rem;
+    font-weight: bold;
+    letter-spacing: 0.05rem;
+    margin-bottom: 1rem;
+    margin-top: 1rem;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.error-message {
+    background-color: #f8d7da;
+    color: #c62828;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+.success-message {
+    background-color: #d4edda;
+    color: #2e7d32;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+.permissions-section {
+    padding: 0.25rem;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+}
+
+.permissions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+    gap: 1rem;
+}
+
+.permission-item {
+    display: flex;
+    align-items: center;
+}
+
+.permission-item input[type="checkbox"] {
+    margin-right: 0.5rem;
+}
+
+.permission-item input[type="checkbox"]:disabled + span {
+    color: #6c757d;
+}
+
+.create-team-heading,
+.create-user-heading,
+.existing-user-heading {
+    color: #EF6F53  ;
+    text-align: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+    letter-spacing: 0.05rem;
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+}
+
+.existing-user-heading {
+    margin-top: 1rem;
+}
+
+.create-team-heading{
+    margin-bottom: 0;
+}
+
+.team-inputsss{
+    display: flex;
+    flex-direction: row;
+    margin-top: 0.25rem;
+
+}
+.team-inputt {
+    gap: 10px;
+    width: 50%;
+    margin: auto;
+}
+
+.team-inputt input {
+    flex: 1;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    width: 100%;
+}
+
+
+.sectionn {
+    background: white;
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    width: 90%;
+    margin: auto;
+}
+
+
+.create-button {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    /* width: 8vw; */
+    background-color: #2196f3;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 2px 8px;
+    cursor: pointer;
+    margin-top: 10px;
+    margin: auto;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.create-button:hover {
+    background-color: #007bff;
+    transform: translateY(2px); 
+}
+
+.user-formm {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.user-inputs {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.user-inputs input,
+.user-inputs select {
+    padding: 2px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    flex: 1;
+    min-width: 180px;
+    max-width: 250px;
+}
+
+.permissions-heading {
+    color: #EF6F53;
+    font-size: 1.35rem;
+    font-weight: bold;
+    letter-spacing: 0.05rem;
+    margin-bottom: 1rem;
+    margin-top: 0;
+    text-transform: uppercase;
+}
+
+.permission-item {
+    display: flex;
+    flex-direction: row;
+    gap: 5px;
+    border-radius: 4px;
+}
+
+.permission-item label {
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    font-size: 0.9rem;
+}
+
+
+
+.users-list {
+    width: 90%;
+    margin: 0 auto 2rem;
+    border-radius: 12px;
+    overflow: hidden;
+    background: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    margin-top: 20px;
+    margin-bottom: 1rem;
+}
+
+.team-section {
+    width: 95%;
+    margin: 1.5rem auto;
+    background: white;
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.team-section:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.business-head-section {
+    border-left: 4px solid #EF6F53;
+    padding-left: 1rem;
+}
+
+.team-leader-section {
+    border-left: 4px solid #2196f3;
+    padding-left: 1rem;
+}
+
+.user-section {
+    border-left: 4px solid #4CAF50;
+    padding-left: 1rem;
+}
+
+.team-name {
+    color: #364C63;
+    font-size: 1.2rem;
+    font-weight: bold;
+    letter-spacing: 0.05rem;
+    padding: 0.15rem;
+    margin-bottom: 0.5rem;
+    border-bottom: 2px solid #EF6F53;
+    text-transform: uppercase;
+    text-align: center;
+    position: relative;
+}
+
+.team-name::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 50px;
+    height: 2px;
+    background-color: #2196f3;
+}
+
+.user-row {
+    display: flex;
+    padding: 0.15rem;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.2s;
+}
+
+.user-row:last-child {
+    border-bottom: none;
+}
+
+.user-row:hover {
+    background-color: #f9f9f9;
+}
+
+.user-row.header {
+    background-color: #364C63;
+    font-weight: bold;
+    color: white;
+    border-bottom: 2px solid #ddd;
+    border-radius: 6px 6px 0 0;
+}
+
+.user-row.header .user-col {
+    color: white;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.user-col {
+    flex: 1;
+    padding: 0.15rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.user-col:first-child {
+    font-weight: 500;
+    color: #2196f3;
+}
+
+.user-col:nth-child(3) {
+    text-transform: uppercase;
+    font-weight: 500;
+}
+
+.user-col.role-team_leader {
+    color: #9c27b0;
+    font-weight: bold;
+}
+
+.user-col.role-user {
+    color: #4CAF50;
+}
+
+.user-col.role-business_head {
+    color: #007bff;
+    font-weight: bold;
+}
+
+.user-col.role-it_admin {
+    color: orangered;
+    font-weight: bold;
+}
+.user-col.role-mis {
+    color: rgb(28, 211, 138);
+    font-weight: bold;
+}
+
+.permission-item {
+    display: inline-block;
+    margin: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    background-color: #e3f2fd;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    color: #2196f3;
+}
+
+
+
+@media (max-width: 768px) {
+    .users-list {
+        grid-template-columns: 1fr;
+    }
+}

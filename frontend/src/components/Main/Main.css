@@ -1,0 +1,25 @@
+/* src/components/Main.css */
+
+body, html {
+    margin: auto;
+    padding: 0.2rem;
+    overflow-x: hidden;
+    background-color: #364c63;
+  }
+  
+  
+  #root { 
+    overflow-x: hidden;
+  }
+  
+  .element-style{
+    overflow-x: hidden;
+  }
+    
+  .column{
+    overflow-x: hidden;
+  }
+  
+
+  
+  

@@ -1,0 +1,193 @@
+/* src/components/routes/Other/Header/Header.css */
+
+.header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: white;
+    height: 12vh;
+    padding: 2rem;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.logo-link {
+    display: inline-block;
+    text-decoration: none;
+}
+
+.logo-link:hover {
+    opacity: 0.9;
+}
+
+.logo {
+    height: 3.25rem;
+    width: auto;
+    cursor: pointer;
+}
+
+.header-container > .logo {
+    cursor: default;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 2rem; /* Add space between elements */
+}
+
+/* Search input styling */
+.header-search {
+    display: flex;
+    align-items: center;
+    position: relative;
+}
+
+.form-control {
+    height: 2rem;
+    border-radius: 20px;
+    border: 1px solid #ccc;
+    padding: 0.5rem 1rem;
+    font-size: 0.7rem;
+    width: 150px;
+    transition: box-shadow 0.3s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.715);
+}
+
+.srch-icon {
+    width: 15px;
+    height: 15px;
+    position: absolute;
+    right: 10px;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+}
+
+.admin-link {
+    display: inline-block;
+    padding: 8px 16px;
+    background-color: #1976d2;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: background-color 0.3s ease;
+}
+
+.admin-link:hover {
+    background-color: #1565c0;
+}
+
+
+.srch-icon:hover {
+    transform: scale(1.25);
+}
+
+/* File upload section */
+.file-upload-section {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    position: relative;
+}
+
+.file-icon {
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+}
+
+.file-icon:hover {
+    transform: scale(1.25);
+}
+
+.file-upl {
+    font-size: 0.85rem;
+    color: #666;
+    margin-right: 0.5rem;
+    margin-left: -1rem;
+    cursor: pointer;
+    transition: color 0.3s ease;
+}
+
+
+.profile-section{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+}
+
+.profile-section .pro-icon {
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+}
+
+.profile-section span {
+    white-space: nowrap;
+    text-align: center;
+    color: #364C63;
+}
+
+/* Profile icon styling */
+.pro-icon {
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border-radius: 50%;
+    border: 1px solid #ccc;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+}
+
+.pro-icon:hover {
+    transform: scale(1.25);
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+}
+
+.download-section {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    margin: 0 15px;
+}
+
+.download-icon {
+    width: 20px;
+    height: 20px;
+}
+
+.download-text {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.download-icon {
+    transition: transform 0.2s;
+}
+
+.download-icon:hover {
+    transform: scale(1.1);
+}
+
+.notification-icon {
+    width: 25px;
+    height: 25px;
+    cursor: pointer;
+    transition: transform 0.2s;
+    border: 1px solid #b40000;
+    border-radius: 45%;
+    box-shadow: 0 0 3px rgba(180, 0, 0, 0.5);
+}
+
+.notification-icon:hover {
+    transform: scale(1.25);
+    box-shadow: 0 0 6px rgba(180, 0, 0, 0.8);
+}

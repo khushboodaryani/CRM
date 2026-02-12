@@ -1,0 +1,315 @@
+/* src/components/routes/Forms/ListForm/ListForm.css */
+
+.list-container {
+  display: flex; /* Use flexbox */
+  flex-direction: column; /* Stack children vertically */
+  height: 80vh;
+  background-color: #f9f9f9;
+  border-radius: 5px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin: auto;
+  width: 95%;
+  text-align: left;
+  transition: all 0.3s ease-in-out;
+}
+
+.list-container:hover {
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+}
+
+.list_form_headi {
+  color: #EF6F53;
+  text-align: center;
+  font-size: 1.25rem;
+  font-weight: bold;
+  letter-spacing: 0.05rem;
+  margin-bottom: 0.5rem;
+  margin-top: 0.5rem;
+  text-transform: uppercase;
+  transition: color 0.3s ease;
+  cursor: pointer;
+}
+
+
+.customers-table {
+  border-collapse: collapse;
+  background-color: white;
+  width: 100%;
+  flex: 1;
+}
+
+.customers-table th {
+  background-color: #364C63;
+  color: white;
+  padding: 0.2rem 0.5rem;
+  text-align: left;
+  font-weight: bold;
+  font-size: 0.75rem;
+  border-bottom: 2px solid #EF6F53;
+  position: relative;
+  top: 0;
+  z-index: 1;
+}
+
+.customers-table td {
+  padding: 0.2rem 0.5rem;
+  border-bottom: 1px solid #ddd;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #364C63;
+  height: 20px;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.customers-table tr {
+  height: 20px;
+}
+
+.customers-table tr:hover {
+  background-color: #f1f1f1;
+  cursor: pointer;
+}
+
+.customers-table tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+/* Team assignment controls */
+
+.team-assignment-controls{
+  margin-bottom: 0.5rem;
+}
+
+.delete-selected-btn{
+  background-color: #EF6F53;
+  color: white;
+  border: none;
+  padding: 0.25rem;
+  font-size: 0.75rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.delete-selected-btn:hover{
+  background-color: #f8360b;
+  transform: translateY(1px); 
+}
+
+.delete-selected-btn:disabled {
+  background: #ffd1c7;
+  cursor: not-allowed;
+}
+
+.team-user-select {
+  padding: 0.25rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  color: #364C63;
+  background-color: white;
+  margin-left: 2rem;
+  margin-right: 0.5rem;
+}
+
+.assign-team-btn {
+  background-color: #EF6F53;
+  color: white;
+  border: none;
+  padding: 0.25rem;
+  font-size: 0.75rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.assign-team-btn:hover:not(:disabled) {
+  background-color: #d65d43;
+}
+
+.assign-team-btn:disabled {
+  background: #ffd1c7;
+  cursor: not-allowed;
+}
+
+/* Checkbox styles */
+.customers-table input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #EF6F53;
+}
+
+.customers-table th:first-child,
+.customers-table td:first-child {
+  /* width: 10px; */
+  text-align: center;
+  padding: 0.5rem;
+}
+
+/* Selection indicator */
+.selected-row {
+  background-color: #fff3f0 !important;
+}
+
+.selected-row:hover {
+  background-color: #ffe9e4 !important;
+}
+
+/* Checkbox styles */
+.customers-table th input[type="checkbox"] {
+  margin: 0;
+}
+
+.customers-table td input[type="checkbox"] {
+  margin: 0;
+}
+
+
+/* Pagination Styling */
+.pagination-container {
+  background-color: #364C63;
+  padding: 0.5rem; 
+  border-top: 2px solid #EF6F53; 
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #364C63;
+  border-radius: 10px;
+  overflow-x: auto;
+  margin: auto;
+}
+
+.pagination button {
+  background-color: #EF6F53;
+  color: white;
+  border: none;
+  margin: 0 5px;
+  padding: 0.5rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  font-size: 0.6rem; 
+  border-radius: 5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pagination button:hover {
+  background-color: #FF8369; 
+}
+
+.pagination button.active {
+  background-color: #dd3e1e;
+  font-weight: bold;
+}
+
+.pagination button:focus {
+  outline: none;
+}
+
+.pagination button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.ellipsis {
+  margin: 0 5px;
+  color: #EF6F53; /* Set the dots color */
+  font-weight: bold; /* Optional: Makes the dots more prominent */
+}
+.page-number {
+  margin: 0 5px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.page-number.active {
+  background-color: #007bff;
+  color: #fff;
+  border-radius: 5px;
+}
+
+
+/* Add max-height and scrolling for table body */
+.table-container {
+  height: 100%;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.5rem;
+}
+.add-record-btn{
+  display: flex;
+  width: 8vw;
+  background-color: #EF6F53;
+  color: white;
+  border: none;
+  padding: 0.25rem;
+  font-size: 0.75rem;
+  border-radius: 5px;
+  cursor: pointer;
+  margin: auto;
+  align-items:center ;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.add-record-btn:hover{
+  background-color: #f8360b;
+  transform: translateY(1px); 
+}
+/* .add-fi{
+  display: flex;
+  justify-content: center; 
+  margin-top: 2rem;
+} */
+
+/* .add-record-btn {
+  display: flex;
+  width: 8vw;
+  background-color: #EF6F53;
+  color: white;
+  border: none;
+  padding: 0.25rem;
+  font-size: 0.75rem;
+  border-radius: 5px;
+  cursor: pointer;
+  margin: auto;
+  align-items:center ;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+} */
+
+/* .add-record-btn:hover{
+  background-color: #f8360b;
+  transform: translateY(1px); 
+}
+
+.add-field-btn {
+  display: flex;
+  width: 8vw;
+  background-color: #EF6F53;
+  color: white;
+  border: none;
+  padding: 0.25rem;
+  font-size: 0.75rem;
+  border-radius: 5px;
+  cursor: pointer;
+  margin: auto;
+  align-items:center ;
+  justify-content: center;
+  
+  transition: background-color 0.3s ease, transform 0.2s ease;
+} */
+
+/* .add-field-btn:hover{
+  background-color: #f8360b;
+  transform: translateY(2px); 
+} */
