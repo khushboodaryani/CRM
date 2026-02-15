@@ -2,13 +2,16 @@
 
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import './AdminPortal.css';
 
 const AdminPortal = () => {
     const isLoggedIn = !!localStorage.getItem("token");
+    const navigate = useNavigate(); // Add navigation hook
     const [teams, setTeams] = useState([]);
     const [newTeams, setNewTeams] = useState(['']);
     const [users, setUsers] = useState([]);
+
     // Define default permissions by role
     const getDefaultPermissions = (role) => {
         const permissions = {
@@ -83,10 +86,10 @@ const AdminPortal = () => {
             const token = localStorage.getItem('token');
             const apiUrl = process.env.REACT_APP_API_URL;
             const response = await axios.get(`${apiUrl}/players/teams`, {
-              headers: { 
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-              },
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
             });
             setTeams(response.data);
         } catch (err) {
@@ -99,10 +102,10 @@ const AdminPortal = () => {
             const token = localStorage.getItem('token');
             const apiUrl = process.env.REACT_APP_API_URL;
             const response = await axios.get(`${apiUrl}/players/users`, {
-              headers: { 
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-              },
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
             });
             setUsers(response.data.data || []); // Access the data property and provide a fallback empty array
         } catch (err) {
@@ -117,17 +120,13 @@ const AdminPortal = () => {
         setNewTeams(updatedTeams);
     };
 
-    // const addTeamInput = () => {
-    //     setNewTeams([...newTeams, '']);
-    // };
-
     const handleCreateTeams = async () => {
         const validTeams = newTeams.filter(team => team.trim() !== '');
         try {
             const token = localStorage.getItem('token');
             const apiUrl = process.env.REACT_APP_API_URL;
             for (const teamName of validTeams) {
-                await axios.post(`${apiUrl}/players/teams`, 
+                await axios.post(`${apiUrl}/players/teams`,
                     { team_name: teamName },
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
@@ -193,7 +192,7 @@ const AdminPortal = () => {
 
             const token = localStorage.getItem('token');
             const apiUrl = process.env.REACT_APP_API_URL;
-            
+
             // Format user data for backend
             const userData = {
                 username: newUser.username.trim(),
@@ -202,13 +201,15 @@ const AdminPortal = () => {
                 role_type: newUser.role,
                 permissions: newUser.permissions
             };
-            
-            const response = await axios.post(`${apiUrl}/users/create`, 
+
+            const response = await axios.post(`${apiUrl}/users/create`,
                 userData,
-                { headers: { 
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json"
-                }}
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        "Content-Type": "application/json"
+                    }
+                }
             );
             setSuccess(response.data.message);
             setNewUser({
@@ -225,102 +226,99 @@ const AdminPortal = () => {
         }
     };
 
+
     return (
         <div className="admin-portal-container">
             <div className="admin-portal">
-            <h2 className='admin-portal-heading'>Admin Portal</h2>
+                <div className="portal-header">
+                    <h2 className='admin-portal-heading'>Business Head Portal</h2>
+                    <button onClick={() => navigate('/form-creation')} className="add-form-btn">Add Form</button>
+                </div>
 
-            <div className="sectionnn">
-                <h3 className='create-team-heading'>Create Team</h3>
-                <div className='team-inputsss'>
-                    {newTeams.map((team, index) => (
-                        <div key={index} className="team-inputt">
-                            <input
-                                type="text"
-                                value={team}
-                                onChange={(e) => handleTeamInputChange(index, e.target.value)}
-                                placeholder="Enter team name"
-                            />
-                            {/* {index === newTeams.length - 1 && (
+                <div className="sectionnn">
+                    <h3 className='create-team-heading'>Create Team</h3>
+                    <div className='team-inputsss'>
+                        {newTeams.map((team, index) => (
+                            <div key={index} className="team-inputt">
+                                <input
+                                    type="text"
+                                    value={team}
+                                    onChange={(e) => handleTeamInputChange(index, e.target.value)}
+                                    placeholder="Enter team name"
+                                />
+                                {/* {index === newTeams.length - 1 && (
                                 <button onClick={addTeamInput} className="add-button">+</button>
                             )} */}
-                        </div>
-                    ))}
-                    <button onClick={handleCreateTeams} className="create-button">Create Team</button>
+                            </div>
+                        ))}
+                        <button onClick={handleCreateTeams} className="create-button">Create Team</button>
+                    </div>
                 </div>
-            </div>
 
-            <div className="sectionn">
-                <h3 className='create-user-heading'>Create User</h3>
-                <div className="user-formm">
-                    <div className="user-inputs">
-                        <input
-                            type="text"
-                            value={newUser.username}
-                            onChange={(e) => handleUserInputChange('username', e.target.value)}
-                            placeholder="Username"
-                        />
-                        <input
-                            type="email"
-                            value={newUser.email}
-                            onChange={(e) => handleUserInputChange('email', e.target.value)}
-                            placeholder="Email"
-                        />
+                <div className="sectionn">
+                    <h3 className='create-user-heading'>Create User</h3>
+                    <div className="user-formm">
+                        <div className="user-inputs">
+                            <input
+                                type="text"
+                                value={newUser.username}
+                                onChange={(e) => handleUserInputChange('username', e.target.value)}
+                                placeholder="Username"
+                            />
+                            <input
+                                type="email"
+                                value={newUser.email}
+                                onChange={(e) => handleUserInputChange('email', e.target.value)}
+                                placeholder="Email"
+                            />
 
-                        <select 
-                            value={newUser.role} 
-                            onChange={(e) => handleUserInputChange('role', e.target.value)}
-                        >
-                            <option value="">Select Role</option>
-                            <option value="user">User</option>
-                            <option value="team_leader">Team Leader</option>
-                            <option value="business_head">Business Head</option>
-                            {/* <option value="it_admin">IT Admin</option> */}
-                            <option value="mis">MIS</option>
-                        </select>
-                        {newUser.role !== 'business_head' && newUser.role !== 'mis' && (
                             <select
-                                value={newUser.team}
-                                onChange={(e) => handleUserInputChange('team', e.target.value)}
+                                value={newUser.role}
+                                onChange={(e) => handleUserInputChange('role', e.target.value)}
                             >
-                                <option value="">Select Team</option>
-                                {teams.map(team => (
-                                    <option key={team.id} value={team.id}>{team.team_name}</option>
-                                ))}
+                                <option value="">Select Role</option>
+                                <option value="user">User</option>
+                                <option value="team_leader">Team Leader</option>
+                                {/* Only Super Admin can create Business Head */}
+                                {localStorage.getItem('user') && JSON.parse(localStorage.getItem('user')).role === 'super_admin' && (
+                                    <option value="business_head">Business Head</option>
+                                )}
+                                <option value="mis">MIS</option>
                             </select>
-                        )}
-                    </div>
-
-                    <div className="permissions-section">
-                        <h4 className='permissions-heading'>Permissions</h4>
-                        <div className="permissions-grid">
-                            {Object.entries(newUser.permissions).map(([key, value]) => (
-                                <div key={key} className="permission-item">
-                                    <label className="flex items-center">
-                                        <input
-                                            type="checkbox"
-                                            checked={value}
-                                            onChange={(e) => handleUserInputChange(`permission_${key}`, e.target.checked)}
-                                            className="mr-2"
-                                            disabled={
-                                                key === 'view_assigned_customers' || 
-                                                (newUser.role === 'business_head' && 
-                                                    (key === 'view_customer' || 
-                                                     key === 'view_team_customers' || 
-                                                     key === 'view_assigned_customers')) ||
-                                                (newUser.role === 'mis' && 
-                                                    !['upload_document', 'download_data'].includes(key))
-                                            }
-                                        />
-                                        {permissionDisplayNames[key]}
-                                    </label>
-                                </div>
-                            ))}
+                            {newUser.role !== 'business_head' && newUser.role !== 'mis' && (
+                                <select
+                                    value={newUser.team}
+                                    onChange={(e) => handleUserInputChange('team', e.target.value)}
+                                >
+                                    <option value="">Select Team</option>
+                                    {teams.map(team => (
+                                        <option key={team.id} value={team.id}>{team.team_name}</option>
+                                    ))}
+                                </select>
+                            )}
                         </div>
-                    </div>
 
-                    <button onClick={handleCreateUser} className="create-button">Create User</button>
-                </div>
+                        <div className="permissions-section">
+                            <h4 className='permissions-heading'>Permissions</h4>
+                            <div className="permissions-grid">
+                                {Object.entries(newUser.permissions).map(([key, value]) => (
+                                    <div key={key} className="permission-item">
+                                        <label className="flex items-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={value}
+                                                onChange={(e) => handleUserInputChange(`permission_${key}`, e.target.checked)}
+                                                className="mr-2"
+                                            />
+                                            {permissionDisplayNames[key]}
+                                        </label>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <button onClick={handleCreateUser} className="create-button">Create User</button>
+                    </div>
 
                 </div>
             </div>
@@ -331,8 +329,8 @@ const AdminPortal = () => {
                     {/* Group users by team */}
                     {teams.map(team => {
                         // Filter users for this team, excluding super_admin
-                        const teamUsers = users.filter(user => 
-                            user.team_id === team.id && 
+                        const teamUsers = users.filter(user =>
+                            user.team_id === team.id &&
                             user.role !== 'super_admin' // Exclude super_admin users
                         );
                         // Sort users by role (team_leader first, then users)
@@ -376,7 +374,7 @@ const AdminPortal = () => {
                     {/* Show users without team (like business_head) separately, excluding super_admin */}
                     {users.filter(user => !user.team_id && user.role !== 'super_admin').length > 0 && (
                         <div className="team-section business-head-section">
-                            <h4 className="team-name">Admin</h4>
+                            <h4 className="team-name">BUSINESS HEAD</h4>
                             <div className="user-row header">
                                 <div className="user-col">Name</div>
                                 <div className="user-col">Email</div>

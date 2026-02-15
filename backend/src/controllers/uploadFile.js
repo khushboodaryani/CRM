@@ -10,15 +10,15 @@ const uploadDataStore = new Map();
 const validateEnumValue = (value, enumValues) => {
     if (!value) return null;
     const cleanValue = String(value).trim().toLowerCase();
-    
+
     // Find exact match first
     const exactMatch = enumValues.find(enumVal => enumVal.toLowerCase() === cleanValue);
     if (exactMatch) return exactMatch;
-    
+
     // Find partial match (for cases like "lead (Corrected...)" -> "lead")
     const partialMatch = enumValues.find(enumVal => cleanValue.includes(enumVal.toLowerCase()));
     if (partialMatch) return partialMatch;
-    
+
     // Return null if no match found
     return null;
 };
@@ -42,7 +42,7 @@ const enumDefinitions = {
 // Helper function to format date
 const formatDate = (dateStr) => {
     if (!dateStr) return null;
-    
+
     // Convert to string and trim
     const strDate = String(dateStr).trim();
     if (!strDate) return null;
@@ -54,20 +54,20 @@ const formatDate = (dateStr) => {
             // Excel date starting point (January 1, 1900, but Excel incorrectly treats 1900 as a leap year)
             // So we use December 30, 1899 as the epoch
             const excelEpoch = new Date(1899, 11, 30);
-            
+
             // Calculate days and fractional day (time portion)
             const wholeDays = Math.floor(numericDate);
             const timeFraction = numericDate - wholeDays;
-            
+
             // Add days to epoch
             const date = new Date(excelEpoch.getTime() + (wholeDays * 24 * 60 * 60 * 1000));
-            
+
             // Add time portion (fractional day converted to milliseconds)
             if (timeFraction > 0) {
                 const timeMs = Math.round(timeFraction * 24 * 60 * 60 * 1000);
                 date.setTime(date.getTime() + timeMs);
             }
-            
+
             // Validate the resulting date
             if (!isNaN(date.getTime()) && date.getFullYear() >= 1900 && date.getFullYear() <= 2100) {
                 // Return full datetime format for MySQL DATETIME column
@@ -77,7 +77,7 @@ const formatDate = (dateStr) => {
                 const hours = String(date.getHours()).padStart(2, '0');
                 const minutes = String(date.getMinutes()).padStart(2, '0');
                 const seconds = String(date.getSeconds()).padStart(2, '0');
-                
+
                 return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
             }
         }
@@ -97,8 +97,8 @@ const formatDate = (dateStr) => {
             const month = parseInt(parts[1], 10);
             const year = parseInt(parts[2], 10);
 
-            if (day > 0 && day <= 31 && 
-                month > 0 && month <= 12 && 
+            if (day > 0 && day <= 31 &&
+                month > 0 && month <= 12 &&
                 year >= 1900 && year <= 2100) {
                 const paddedDay = day.toString().padStart(2, '0');
                 const paddedMonth = month.toString().padStart(2, '0');
@@ -142,10 +142,10 @@ export const uploadCustomerData = async (req, res) => {
             const [userResults] = await connection.query(
                 'SELECT username, team_id FROM users'
             );
-            
+
             if (userResults.length === 0) {
-                return res.status(400).json({ 
-                    message: 'No users found in the system.' 
+                return res.status(400).json({
+                    message: 'No users found in the system.'
                 });
             }
 
@@ -199,14 +199,16 @@ export const uploadCustomerData = async (req, res) => {
                     continue;
                 }
 
-                // Build duplicate check query
+                // Build duplicate check query with company isolation
                 const duplicateQuery = `
                     SELECT * FROM customers 
-                    WHERE (phone_no = ? OR (? IS NOT NULL AND email_id = ?))
+                    WHERE company_id = ?
+                    AND (phone_no = ? OR (? IS NOT NULL AND email_id = ?))
                     AND first_name = ?
                 `;
 
                 const queryParams = [
+                    req.user.company_id, // Add company_id filter
                     phone,
                     email,
                     email,
@@ -233,7 +235,7 @@ export const uploadCustomerData = async (req, res) => {
 
             // Generate a unique upload ID
             const uploadId = uuid();
-            
+
             // Store the processed data with agent information
             uploadDataStore.set(uploadId, {
                 newRecords,
@@ -267,7 +269,7 @@ export const uploadCustomerData = async (req, res) => {
 
     } catch (error) {
         console.error('Error processing upload:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
             message: 'Failed to process upload',
             error: error.message
@@ -278,20 +280,20 @@ export const uploadCustomerData = async (req, res) => {
 export const confirmUpload = async (req, res) => {
     let connection;
     let recordsUploaded = 0;
-    
+
     try {
         const { uploadId, proceed, duplicateActions } = req.body;
 
         if (!uploadId) {
-            return res.status(400).json({ 
+            return res.status(400).json({
                 success: false,
-                message: 'Upload ID is required' 
+                message: 'Upload ID is required'
             });
         }
 
         if (!proceed) {
             uploadDataStore.delete(uploadId);
-            return res.json({ 
+            return res.json({
                 success: true,
                 message: 'Upload cancelled',
                 recordsUploaded: 0
@@ -300,9 +302,9 @@ export const confirmUpload = async (req, res) => {
 
         const uploadData = uploadDataStore.get(uploadId);
         if (!uploadData) {
-            return res.status(404).json({ 
+            return res.status(404).json({
                 success: false,
-                message: 'Upload data not found or expired. Please try uploading again.' 
+                message: 'Upload data not found or expired. Please try uploading again.'
             });
         }
 
@@ -318,7 +320,7 @@ export const confirmUpload = async (req, res) => {
             const [lastIdResult] = await connection.query(
                 'SELECT C_unique_id FROM customers ORDER BY CAST(SUBSTRING(C_unique_id, 4) AS UNSIGNED) DESC LIMIT 1'
             );
-            
+
             const lastId = lastIdResult[0]?.C_unique_id || 'FF_0';
             const lastNumericPart = parseInt(lastId.split('_')[1]) || 0;
             let nextId = lastNumericPart + 1;
@@ -335,11 +337,14 @@ export const confirmUpload = async (req, res) => {
                 columnNames.forEach(colName => {
                     if (colName === 'C_unique_id') {
                         values.push(`FF_${nextId++}`);
-                    } else {    
+                    } else if (colName === 'company_id') {
+                        // Set company_id from authenticated user
+                        values.push(req.user.company_id);
+                    } else {
                         // Apply date formatting to datetime columns
-                        const dateTimeColumns = [ 'call_date_time', 'next_follow_up'];
+                        const dateTimeColumns = ['call_date_time', 'next_follow_up'];
                         let value = record[headerMapping[colName]] || null;
-                        
+
                         if (dateTimeColumns.includes(colName)) {
                             value = formatDate(value);
                         } else if (enumDefinitions[colName]) {
@@ -364,17 +369,17 @@ export const confirmUpload = async (req, res) => {
 
                 const record = duplicate.new_record;
                 const existingRecord = duplicate.existing_record;
-                
+
                 if (action === 'append') {
                     // Get the base C_unique_id from the existing record
                     const baseId = existingRecord.C_unique_id.split('__')[0]; // Get the base part before any __
-                    
+
                     // Find all records with this base ID to determine next suffix
                     const [suffixResults] = await connection.query(
                         'SELECT C_unique_id FROM customers WHERE C_unique_id LIKE ? OR C_unique_id = ? ORDER BY CAST(SUBSTRING_INDEX(C_unique_id, "__", -1) AS UNSIGNED) DESC LIMIT 1',
                         [`${baseId}__%`, baseId]
                     );
-                    
+
                     let newCUniqueId;
                     if (suffixResults.length === 0 || suffixResults[0].C_unique_id === baseId) {
                         // No suffixed records exist yet
@@ -392,15 +397,18 @@ export const confirmUpload = async (req, res) => {
                         .filter(name => !['id', 'date_created', 'last_updated', 'scheduled_at'].includes(name));
 
                     const insertQuery = `INSERT INTO customers (${columnNames.join(', ')}) VALUES (${columnNames.map(() => '?').join(', ')})`;
-                    
+
                     const values = columnNames.map(colName => {
                         if (colName === 'C_unique_id') {
                             return newCUniqueId;
+                        } else if (colName === 'company_id') {
+                            // Set company_id from authenticated user
+                            return req.user.company_id;
                         } else {
                             // Apply date formatting to datetime columns
-                            const dateTimeColumns = [ 'call_date_time', 'next_follow_up'];
+                            const dateTimeColumns = ['call_date_time', 'next_follow_up'];
                             let value = record[headerMapping[colName]] || null;
-                            
+
                             if (dateTimeColumns.includes(colName)) {
                                 value = formatDate(value);
                             } else if (enumDefinitions[colName]) {
@@ -420,15 +428,18 @@ export const confirmUpload = async (req, res) => {
                     const columnNames = columns.map(col => col.Field)
                         .filter(name => !['id', 'C_unique_id', 'date_created', 'last_updated', 'scheduled_at'].includes(name));
 
-                    const updateQuery = `UPDATE customers SET ${
-                        columnNames.map(col => `${col} = ?`).join(', ')
-                    } WHERE phone_no = ? AND first_name = ?`;
+                    const updateQuery = `UPDATE customers SET ${columnNames.map(col => `${col} = ?`).join(', ')
+                        } WHERE phone_no = ? AND first_name = ?`;
 
                     const values = columnNames.map(colName => {
+                        if (colName === 'company_id') {
+                            // Keep existing company_id (don't change it during update)
+                            return req.user.company_id;
+                        }
                         // Apply date formatting to datetime columns
-                        const dateTimeColumns = [ 'call_date_time', 'next_follow_up'];
+                        const dateTimeColumns = ['call_date_time', 'next_follow_up'];
                         let value = record[headerMapping[colName]] || null;
-                        
+
                         if (dateTimeColumns.includes(colName)) {
                             value = formatDate(value);
                         } else if (enumDefinitions[colName]) {
@@ -451,15 +462,15 @@ export const confirmUpload = async (req, res) => {
         await connection.commit();
         uploadDataStore.delete(uploadId);
 
-        res.status(200).json({ 
+        res.status(200).json({
             success: true,
             message: `Successfully processed ${recordsUploaded} records`,
             recordsUploaded
         });
-        
+
     } catch (error) {
         console.error('Error in confirmUpload:', error);
-        
+
         if (connection) {
             try {
                 await connection.rollback();
@@ -468,7 +479,7 @@ export const confirmUpload = async (req, res) => {
             }
         }
 
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
             message: 'Failed to process upload confirmation',
             error: error.message

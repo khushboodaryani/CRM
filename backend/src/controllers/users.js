@@ -16,10 +16,20 @@ export const createUser = async (req, res) => {
         permissions
     } = req.body;
 
+    // Get company_id from authenticated user (NOT from request body)
+    const company_id = req.user.company_id;
+
+    // Only Business Head or Super Admin can create users
+    if (!['super_admin', 'business_head'].includes(req.user.role)) {
+        return res.status(403).json({
+            error: 'Only Business Head or Super Admin can create users'
+        });
+    }
+
     // Validate required fields
     if (!username || !email || !role_type) {
         console.log('Missing fields:', { username, email, role_type });
-        return res.status(400).json({ 
+        return res.status(400).json({
             error: 'Missing required fields: username, email, and role_type are required',
             received: { username, email, role_type }
         });
@@ -28,7 +38,7 @@ export const createUser = async (req, res) => {
     // Validate team_id based on role_type
     if (!['business_head', 'mis'].includes(role_type) && !team_id) {
         console.log('Team ID required for non-business_head/mis roles');
-        return res.status(400).json({ 
+        return res.status(400).json({
             error: 'Team ID is required for user and team_leader roles',
             received: { role_type, team_id }
         });
@@ -37,7 +47,7 @@ export const createUser = async (req, res) => {
     // For business_head and mis, team_id should be null
     if (['business_head', 'mis'].includes(role_type) && team_id) {
         console.log('Team ID should not be provided for business_head/mis role');
-        return res.status(400).json({ 
+        return res.status(400).json({
             error: 'Business head and MIS roles should not be assigned to any team',
             received: { role_type, team_id }
         });
@@ -61,16 +71,41 @@ export const createUser = async (req, res) => {
         try {
             await conn.beginTransaction();
 
-            // Check if user already exists
+            // CRITICAL: Check license limit before creating user
+            if (company_id) { // Skip for super_admin
+                const [license] = await conn.query(
+                    'SELECT available_licenses FROM company_licenses WHERE company_id = ?',
+                    [company_id]
+                );
+
+                if (license.length === 0 || license[0].available_licenses <= 0) {
+                    await conn.rollback();
+                    return res.status(403).json({
+                        error: 'License limit reached. Please contact administrator to upgrade.'
+                    });
+                }
+            }
+
+            // Check if user already exists (email must be globally unique)
             const [existingUser] = await conn.query(
-                'SELECT * FROM users WHERE email = ? OR username = ?',
-                [email, username]
+                'SELECT * FROM users WHERE email = ?',
+                [email]
             );
 
             if (existingUser.length > 0) {
                 await conn.rollback();
-                const message = existingUser[0].email === email ? 'Email already exists' : 'Username already exists';
-                return res.status(400).json({ error: message });
+                return res.status(400).json({ error: 'Email already exists' });
+            }
+
+            // Check if username exists within the company
+            const [existingUsername] = await conn.query(
+                'SELECT * FROM users WHERE username = ? AND company_id = ?',
+                [username, company_id]
+            );
+
+            if (existingUsername.length > 0) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'Username already exists in your company' });
             }
 
             // Get role id
@@ -88,22 +123,24 @@ export const createUser = async (req, res) => {
             const defaultPassword = '12345678';
             const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
-            // Create user
+            // Create user with company_id
             const [userResult] = await conn.query(
-                'INSERT INTO users (username, email, password, team_id, role_id) VALUES (?, ?, ?, ?, ?)',
-                [username, email, hashedPassword, ['business_head', 'mis'].includes(role_type) ? null : team_id, roleResult[0].id]
+                'INSERT INTO users (company_id, username, email, password, team_id, role_id) VALUES (?, ?, ?, ?, ?, ?)',
+                [company_id, username, email, hashedPassword, ['business_head', 'mis'].includes(role_type) ? null : team_id, roleResult[0].id]
             );
+
+            // License count will be automatically updated by trigger
 
             // Handle permissions
             if (permissions) {
                 const userId = userResult.insertId;
-                
+
                 // First delete any existing permissions for this user
                 await conn.query('DELETE FROM user_permissions WHERE user_id = ?', [userId]);
-                
+
                 // Get all permission IDs
                 const [permissionRows] = await conn.query('SELECT id, permission_name FROM permissions');
-                
+
                 // Insert each permission individually to better handle errors
                 for (const [permName, value] of Object.entries(permissions)) {
                     const permission = permissionRows.find(p => p.permission_name === permName);
@@ -169,7 +206,7 @@ export const getAllUsers = async (req, res) => {
 
         // Base query to get user information
         let query = `
-            SELECT u.id, u.username, u.email, u.team_id, t.team_name,
+            SELECT u.id, u.username, u.email, u.company_id, u.team_id, t.team_name,
                    r.role_name as role, r.id as role_id,
                    GROUP_CONCAT(DISTINCT p.permission_name) as permissions
             FROM users u
@@ -181,12 +218,19 @@ export const getAllUsers = async (req, res) => {
 
         const params = [];
 
-        // Add role-based filters
-        if (req.user.role === 'team_leader') {
+        // CRITICAL: Add company-based filters
+        if (req.user.role === 'super_admin') {
+            // Super admin can see all users
+            // No additional filter needed
+        } else if (req.user.role === 'business_head') {
+            // Business head sees only their company users
+            query += ' WHERE u.company_id = ?';
+            params.push(req.user.company_id);
+        } else if (req.user.role === 'team_leader') {
             // Team leaders can only see their team members
             query += ' WHERE u.team_id = ? AND r.role_name = "user"';
             params.push(req.user.team_id);
-        } else if (!['super_admin', 'it_admin', 'business_head'].includes(req.user.role)) {
+        } else {
             // Regular users can't see any other users
             return res.status(403).json({ error: 'Access denied' });
         }

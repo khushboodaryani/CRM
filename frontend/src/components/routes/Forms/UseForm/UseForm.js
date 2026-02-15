@@ -15,42 +15,16 @@ const UseForm = () => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [hasDeletePermission, setHasDeletePermission] = useState(false);
-    const [error, setError] = useState(null); 
+    const [error, setError] = useState(null);
     const [customer, setCustomer] = useState(null);
-    const [availableAgents, setAvailableAgents] = useState([]); 
+    const [availableAgents, setAvailableAgents] = useState([]);
     const [editingInfo, setEditingInfo] = useState(false);
     const alertShownRef = useRef(false); // Use a ref to track if the alert has been shown
 
     const [formData, setFormData] = useState({
         first_name: '',
-        last_name: '',
-        company_name: '',
         phone_no: '',
-        email_id: '',
-        address: '',
-        lead_source: 'website',
-        call_date_time: '',
-        call_status: 'connected',
-        call_outcome: 'interested',
-        call_recording: '',
-        product: '',
-        budget: '',
-        decision_making: 'yes',
-        decision_time: 'immediate',
-        lead_stage: 'new',
-        next_follow_up: '',
-        assigned_agent: '',
-        reminder_notes: '',
-        priority_level: 'medium',
-        customer_category: 'warm',
-        tags_labels: 'premium_customer',
-        communcation_channel: 'call',
-        deal_value: '',
-        conversion_status: 'lead',
-        customer_history: 'previous calls',
-        comment: '',
-        agent_name: '',
-        scheduled_at: ''
+        agent_name: ''
     });
 
     const [updatedData, setUpdatedData] = useState(formData);
@@ -78,7 +52,7 @@ const UseForm = () => {
             const value = formData[field];
             return !value || (typeof value === 'string' && !value.trim());
         });
-        
+
         if (missingFields.length > 0) {
             setError(`Please fill in all required fields: ${missingFields.join(', ')}`);
             return false;
@@ -91,14 +65,14 @@ const UseForm = () => {
         try {
             const date = new Date(dateString);
             if (isNaN(date.getTime())) return '';
-            
+
             // Format as YYYY-MM-DDThh:mm
             const year = date.getFullYear();
             const month = String(date.getMonth() + 1).padStart(2, '0');
             const day = String(date.getDate()).padStart(2, '0');
             const hours = String(date.getHours()).padStart(2, '0');
             const minutes = String(date.getMinutes()).padStart(2, '0');
-            
+
             return `${year}-${month}-${day}T${hours}:${minutes}`;
         } catch (error) {
             console.error('Error formatting date:', error);
@@ -149,32 +123,32 @@ const UseForm = () => {
             });
 
             setUser(userResponse.data);
-            
+
             // Get permissions from API response
             const permissions = userResponse.data.permissions || [];
             console.log('Latest user permissions from API:', permissions);
-            
+
             // Check for delete permission
             const hasDeletePerm = Array.isArray(permissions) && permissions.includes('delete_customer');
             console.log('Has delete permission:', hasDeletePerm);
             setHasDeletePermission(hasDeletePerm);
 
-                // Then get the available agents based on user's role
-                try {
-                    const agentsResponse = await axios.get(`${apiUrl}/players/teams`, {
-                        headers: {
-                            Authorization: `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-                    setAvailableAgents(agentsResponse.data);
-        } catch (error) {
-                    console.error('Error fetching available agents:', error);
-                    setError('Failed to fetch available agents');
-                }
-
+            // Then get the available agents based on user's role
+            try {
+                const agentsResponse = await axios.get(`${apiUrl}/players/teams`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                setAvailableAgents(agentsResponse.data);
             } catch (error) {
-                console.error('Error in fetchUser:', error);
+                console.error('Error fetching available agents:', error);
+                setError('Failed to fetch available agents');
+            }
+
+        } catch (error) {
+            console.error('Error in fetchUser:', error);
             setError('Failed to fetch user data');
             setLoading(false);
         }
@@ -186,7 +160,7 @@ const UseForm = () => {
             if (location.state?.customer) {
                 const customerData = location.state.customer;
                 setCustomer(customerData);
-                
+
                 // Format data for display
                 const displayData = { ...customerData };
                 Object.keys(displayData).forEach(key => {
@@ -205,15 +179,15 @@ const UseForm = () => {
                     const apiUrl = process.env.REACT_APP_API_URL;
                     const token = localStorage.getItem('token');
                     const response = await axios.get(`${apiUrl}/customers/phone/${phone_no}`, {
-                        headers: { 
+                        headers: {
                             Authorization: `Bearer ${token}`,
-                            "Content-Type": "application/json", 
+                            "Content-Type": "application/json",
                         },
                     });
                     if (response.data?.customer) {
                         const customerData = response.data.customer;
                         setCustomer(customerData);
-                        
+
                         // Format data for display
                         const displayData = { ...customerData };
                         Object.keys(displayData).forEach(key => {
@@ -302,11 +276,11 @@ const UseForm = () => {
                         });
 
                         setUser(userResponse.data);
-                        
+
                         // Get permissions from API response only
                         const permissions = userResponse.data.permissions || [];
                         console.log('Latest user permissions from API:', permissions);
-                        
+
                         // Check if delete_customer permission exists in the array
                         const hasDeletePerm = Array.isArray(permissions) && permissions.includes('delete_customer');
                         console.log('Has delete permission:', hasDeletePerm);
@@ -342,7 +316,7 @@ const UseForm = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         // First validate required fields
         const requiredFields = {
             'first_name': 'First Name',
@@ -364,12 +338,12 @@ const UseForm = () => {
         Object.keys(formData).forEach(key => {
             let currentValue = formData[key];
             let originalValue = customer[key];
-            
+
             // Convert phone numbers back to storage format for comparison and submission
             if (key.includes('phone') && currentValue) {
                 currentValue = formatPhoneForStorage(currentValue);
             }
-            
+
             // For datetime fields, ensure proper formatting
             if ((key === 'call_date_time' || key === 'next_follow_up' || key === 'scheduled_at') && currentValue) {
                 // If the value is already in the correct format, keep it; otherwise format it
@@ -377,7 +351,7 @@ const UseForm = () => {
                     currentValue = formatDateForInput(currentValue);
                 }
             }
-            
+
             if (currentValue !== originalValue) {
                 changedFields[key] = currentValue;
             }
@@ -399,13 +373,13 @@ const UseForm = () => {
         try {
             const token = localStorage.getItem('token');
             const apiUrl = process.env.REACT_APP_API_URL;
-            
+
             // Update customer data - only send changed fields
             const response = await axios.put(
-                `${apiUrl}/customers/${customer.id}`, 
+                `${apiUrl}/customers/${customer.id}`,
                 changedFields,
                 {
-                    headers: { 
+                    headers: {
                         Authorization: `Bearer ${token}`,
                         "Content-Type": "application/json",
                     },
@@ -425,7 +399,7 @@ const UseForm = () => {
             }
         }
     };
-    
+
     if (loading) return <div>Loading customer data...</div>;
     if (!customer) return <div>No customer data found.</div>;
 
@@ -448,55 +422,55 @@ const UseForm = () => {
                                 {formatPhoneForDisplay(formData.phone_no)}
                             </div>
                         </div>
-                        <EditIcon 
+                        <EditIcon
                             className={`edit-icon ${editingInfo ? 'active' : ''}`}
                             onClick={() => {
                                 setEditingInfo(!editingInfo);
                                 if (!editingInfo) {
                                     setTimeout(() => document.querySelector('input[name="first_name"]')?.focus(), 100);
                                 }
-                            }} 
+                            }}
                         />
                     </div>
                     <form onSubmit={handleSubmit}>
                         {/* Your input fields */}
                         {[
                             ...(editingInfo ? [
-                                { 
-                                    label: "First Name", name: "first_name", required: true 
+                                {
+                                    label: "First Name", name: "first_name", required: true
                                 },
-                                { 
+                                {
                                     label: "Last Name", name: "last_name"
                                 },
-                                { 
+                                {
                                     label: "Phone", name: "phone_no", required: true,
                                     type: "tel", maxLength: "20"
                                 }
                             ] : []),
-                            { 
-                              label: "Company Name", name: "company_name"
+                            {
+                                label: "Company Name", name: "company_name"
                             },
-                            { 
-                              label: "Email", name: "email_id",
-                              type: "email"
+                            {
+                                label: "Email", name: "email_id",
+                                type: "email"
                             },
-                            { 
-                              label: "Address", name: "address"
+                            {
+                                label: "Address", name: "address"
                             },
-                            { 
-                              label: "Call Recording", name: "call_recording"
+                            {
+                                label: "Call Recording", name: "call_recording"
                             },
-                            { 
-                              label: "Product", name: "product"
+                            {
+                                label: "Product", name: "product"
                             },
-                            { 
-                              label: "Budget", name: "budget"
+                            {
+                                label: "Budget", name: "budget"
                             },
-                            { 
-                              label: "Assigned Agent", name: "assigned_agent"
+                            {
+                                label: "Assigned Agent", name: "assigned_agent"
                             },
-                            { 
-                              label: "Deal Value", name: "deal_value"
+                            {
+                                label: "Deal Value", name: "deal_value"
                             },
                         ].map(({ label, name, type = "text", disabled, maxLength, required, pattern }) => (
                             <div key={name} className="label-input">
@@ -530,7 +504,7 @@ const UseForm = () => {
                             <label>Lead Source:</label>
                             <select name="lead_source" value={formData.lead_source} onChange={handleInputChange}>
                                 <option value="website">Website</option>
-                                <option value="data">Data</option>   
+                                <option value="data">Data</option>
                                 <option value="referral">Referral</option>
                                 <option value="ads">Ads</option>
                             </select>
@@ -710,9 +684,9 @@ const UseForm = () => {
 
                         <button className="sbt-use-btn" type="submit">Update</button>
                     </form>
-                    {hasDeletePermission && (  
-                        <button 
-                            onClick={handleDelete} 
+                    {hasDeletePermission && (
+                        <button
+                            onClick={handleDelete}
                             className="add-field-btnnn"
                             aria-label="Delete customer"
                         >
@@ -723,8 +697,8 @@ const UseForm = () => {
 
                 <div>
                     {/* Pass customerId to LastChanges */}
-                    <LastChanges 
-                        customerId={customer?.id || ''} 
+                    <LastChanges
+                        customerId={customer?.id || ''}
                         phone_no={formData?.phone_no || ''}
                     />
                 </div>

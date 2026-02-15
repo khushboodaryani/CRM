@@ -18,13 +18,13 @@ import { makeNewRecord, createCustomer } from '../controllers/createCustomers.js
 
 import { updateCustomer, historyCustomer, gethistoryCustomer } from '../controllers/updateCustomers.js';
 
-import { 
-    registerCustomer, 
-    loginCustomer, logoutCustomer, 
-    fetchCurrentUser, forgotPassword, 
+import {
+    registerCustomer,
+    loginCustomer, logoutCustomer,
+    fetchCurrentUser, forgotPassword,
     resetPasswordWithToken, resetPassword,
     sendOTP,
-    getTeams, checkSession 
+    getTeams, checkSession
 } from '../controllers/sign.js';
 
 import { getReminders, getAllReminders, getScheduleRecords } from '../controllers/schedule.js';
@@ -42,10 +42,30 @@ import { validateSession } from '../middlewares/sessionMiddleware.js';
 
 import { createUser, getAllUsers, getTeamMembers } from '../controllers/users.js';
 
+// Multi-tenant imports
+import {
+    createCompany,
+    getAllCompanies,
+    getCompanyById,
+    updateCompany,
+    deactivateCompany
+} from '../controllers/companies.js';
+
+import { addCustomField, getCustomFields, deleteCustomField } from '../controllers/dynamicFields.js';
+
 const router = express.Router();
 
 // Mount team routes
 router.use('/', teamRoutes);
+
+// ============================================================================
+// SUPER ADMIN ROUTES - Company Management
+// ============================================================================
+router.post('/super-admin/companies', authenticateToken, createCompany);
+router.get('/super-admin/companies', authenticateToken, getAllCompanies);
+router.get('/super-admin/companies/:id', authenticateToken, getCompanyById);
+router.put('/super-admin/companies/:id', authenticateToken, updateCompany);
+router.patch('/super-admin/companies/:id/deactivate', authenticateToken, deactivateCompany);
 
 // Route for user registration
 router.post('/register', restrictUsers, async (req, res) => {
@@ -78,7 +98,7 @@ router.post('/logout', authenticateToken, logoutCustomer);
 // Route to check session
 router.get('/check-session', validateSession, checkSession);
 
-router.get('/players/teams', getTeams);
+router.get('/players/teams', authenticateToken, getTeams);
 
 // Route to get latest customers based on role
 router.get('/customers', authenticateToken, checkPermission('view_customer'), getAllCustomers);
@@ -146,5 +166,12 @@ router.post('/records_schedule', getScheduleRecords);
 router.post('/users/create', authenticateToken, createUser);
 router.get('/users/all', authenticateToken, getAllUsers);
 router.get('/users/team/:teamId', authenticateToken, getTeamMembers);
+
+// Dynamic fields routes (Business Head only)
+
+
+router.post('/custom-fields', authenticateToken, addCustomField);
+router.get('/custom-fields', authenticateToken, getCustomFields);
+router.delete('/custom-fields/:fieldName', authenticateToken, deleteCustomField);
 
 export default router;

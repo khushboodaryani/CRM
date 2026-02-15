@@ -16,8 +16,8 @@ const AdminGuard = ({ children }) => {
         const tokenData = jwtDecode(token);
         console.log('Token data in AdminGuard:', tokenData);
 
-        // Check if user is super_admin or it_admin
-        const isAdmin = tokenData.role.toLowerCase() === 'super_admin' || tokenData.role.toLowerCase() === 'it_admin';
+        // Check if user is business_head, super_admin, or it_admin
+        const isAdmin = ['business_head', 'super_admin', 'it_admin'].includes(tokenData.role.toLowerCase());
         console.log('Is admin:', isAdmin, 'Role:', tokenData.role);
 
         if (!isAdmin) {

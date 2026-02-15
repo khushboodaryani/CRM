@@ -6,6 +6,7 @@ import connectDB from '../db/index.js';
 export const createTeam = async (req, res) => {
     const { team_name } = req.body;
     const created_by = req.user.userId; // Get userId from auth middleware
+    const company_id = req.user.company_id; // Get company_id from auth middleware
 
     try {
         const pool = connectDB();
@@ -14,10 +15,10 @@ export const createTeam = async (req, res) => {
         try {
             await conn.beginTransaction();
 
-            // Check if team already exists
+            // Check if team already exists in this company
             const [existingTeam] = await conn.query(
-                'SELECT id FROM teams WHERE team_name = ?',
-                [team_name]
+                'SELECT id FROM teams WHERE team_name = ? AND company_id = ?',
+                [team_name, company_id]
             );
 
             if (existingTeam.length > 0) {
@@ -25,10 +26,10 @@ export const createTeam = async (req, res) => {
                 return res.status(400).json({ error: 'Team name already exists' });
             }
 
-            // Create new team
+            // Create new team with company_id
             const [result] = await conn.query(
-                'INSERT INTO teams (team_name, created_by) VALUES (?, ?)',
-                [team_name, created_by]
+                'INSERT INTO teams (team_name, company_id, created_by) VALUES (?, ?, ?)',
+                [team_name, company_id, created_by]
             );
 
             await conn.commit();
@@ -57,9 +58,12 @@ export const getAllTeams = async (req, res) => {
     try {
         connection = await pool.getConnection();
 
-        // Get all teams with creator information
+        const company_id = req.user.company_id; // Get company_id from auth middleware
+
+        // Get all teams for this company with creator information
         const [teams] = await connection.query(
-            'SELECT t.*, u.username as created_by_name FROM teams t JOIN users u ON t.created_by = u.id ORDER BY t.created_at DESC'
+            'SELECT t.*, u.username as created_by_name FROM teams t JOIN users u ON t.created_by = u.id WHERE t.company_id = ? ORDER BY t.created_at DESC',
+            [company_id]
         );
 
         res.json(teams);

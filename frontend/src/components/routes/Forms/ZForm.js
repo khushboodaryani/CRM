@@ -19,14 +19,22 @@ import ApproveUser from "../Sign/ApproveUser/ApproveUser";
 import AdminPortal from "./AdminPortal/AdminPortal";
 import AdminGuard from "../../guards/AdminGuard";
 import RequireAuth from '../../guards/RequireAuth';
+import SuperAdminDashboard from '../../SuperAdmin/Dashboard';
+import FormCreation from "./FormCreation/FormCreation";
 
 const ZForm = () => {
     return (
         <Routes>
 
+            {/* Super Admin Dashboard */}
+            <Route path="/super-admin/dashboard" element={<SuperAdminDashboard />} />
+
             {/* Admin Portal - Protected by AdminGuard */}
             <Route path="/admin" element={<AdminGuard><AdminPortal /></AdminGuard>} />
-            
+
+            {/* Dynamic Form Creation - Business Heads only */}
+            <Route path="/form-creation" element={<AdminGuard><FormCreation /></AdminGuard>} />
+
             {/* List all customers */}
             <Route path="/customers" element={<ListForm />} />
 
@@ -47,31 +55,31 @@ const ZForm = () => {
 
             {/* Log customer changes, passing customerId as a prop */}
             <Route path="/customers/log-change/:id" element={<LastChangeWrapper />} />
-            
+
             {/* Use customer form by phone number */}
             <Route path="/customers/phone/:phone_no/updates/" element={<LastChangeWrapper />} />
 
             {/* Upload and Download routes - Protected */}
-            <Route 
-                path="/upload" 
+            <Route
+                path="/upload"
                 element={
                     <RequireAuth>
                         <UploadNew />
                     </RequireAuth>
-                } 
+                }
             />
-            <Route 
-                path="/download" 
+            <Route
+                path="/download"
                 element={
                     <RequireAuth>
                         <DownloadFile />
                     </RequireAuth>
-                } 
+                }
             />
 
             {/* Access call reminders */}
             <Route path="/customers/reminders" element={<Reminder />} />
-            
+
 
             {/* Register a new user
             <Route path="/register" element={<Register />} /> */}
@@ -98,7 +106,7 @@ const ZForm = () => {
 // Wrapper component to extract the customerId from the URL and pass it to LastChanges
 const LastChangeWrapper = () => {
     const { id } = useParams();
-    console.log("Customer ID from URL:", id); 
+    console.log("Customer ID from URL:", id);
     return <LastChanges customerId={id} />;
 };
 

@@ -27,7 +27,7 @@
 }
 
 .admin-portal-heading {
-    color: #EF6F53  ;
+    color: #EF6F53;
     text-align: center;
     font-size: 1.75rem;
     font-weight: bold;
@@ -75,14 +75,14 @@
     margin-right: 0.5rem;
 }
 
-.permission-item input[type="checkbox"]:disabled + span {
+.permission-item input[type="checkbox"]:disabled+span {
     color: #6c757d;
 }
 
 .create-team-heading,
 .create-user-heading,
 .existing-user-heading {
-    color: #EF6F53  ;
+    color: #EF6F53;
     text-align: center;
     font-size: 1.5rem;
     font-weight: bold;
@@ -95,16 +95,17 @@
     margin-top: 1rem;
 }
 
-.create-team-heading{
+.create-team-heading {
     margin-bottom: 0;
 }
 
-.team-inputsss{
+.team-inputsss {
     display: flex;
     flex-direction: row;
     margin-top: 0.25rem;
 
 }
+
 .team-inputt {
     gap: 10px;
     width: 50%;
@@ -148,7 +149,7 @@
 
 .create-button:hover {
     background-color: #007bff;
-    transform: translateY(2px); 
+    transform: translateY(2px);
 }
 
 .user-formm {
@@ -332,6 +333,7 @@
     color: orangered;
     font-weight: bold;
 }
+
 .user-col.role-mis {
     color: rgb(28, 211, 138);
     font-weight: bold;
@@ -347,10 +349,189 @@
     color: #2196f3;
 }
 
+/* Portal Header Styles */
+.portal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
 
+.add-form-btn {
+    background-color: #10b981;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background-color 0.2s;
+}
+
+.add-form-btn:hover {
+    background-color: #059669;
+}
+
+/* Modal Styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.modal-content h3 {
+    color: #364C63;
+    margin-bottom: 20px;
+    font-size: 1.5rem;
+    text-align: center;
+}
+
+.field-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.field-form input,
+.field-form select {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.field-form input:focus,
+.field-form select:focus {
+    outline: none;
+    border-color: #2196f3;
+    box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+}
+
+.enum-values {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+}
+
+.enum-values label {
+    font-weight: 600;
+    color: #364C63;
+    margin-bottom: 5px;
+}
+
+.enum-value-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.enum-value-row input {
+    flex: 1;
+}
+
+.remove-enum-btn {
+    background-color: #ef4444;
+    color: white;
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s;
+}
+
+.remove-enum-btn:hover {
+    background-color: #dc2626;
+}
+
+.add-enum-btn {
+    background-color: #10b981;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+
+.add-enum-btn:hover {
+    background-color: #059669;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 500;
+    color: #364C63;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+}
+
+.cancel-button {
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background-color 0.2s;
+}
+
+.cancel-button:hover {
+    background-color: #5a6268;
+}
 
 @media (max-width: 768px) {
     .users-list {
         grid-template-columns: 1fr;
+    }
+
+    .modal-content {
+        width: 95%;
+        padding: 20px;
+    }
+
+    .portal-header {
+        flex-direction: column;
+        gap: 10px;
     }
 }

@@ -33,7 +33,7 @@ export const registerCustomer = async (req, res) => {
 
             // Check if username or email already exists
             const [existingUser] = await connection.query(
-                'SELECT * FROM users WHERE email = ? OR username = ?', 
+                'SELECT * FROM users WHERE email = ? OR username = ?',
                 [email, username]
             );
 
@@ -90,11 +90,11 @@ export const registerCustomer = async (req, res) => {
 
                 // Specific role-based permission logic
                 if (role_type === 'user') {
-                    // Users only get view_team_customers by default
-                    hasPermission = permission.permission_name === 'view_team_customers';
+                    // Users only get view_assigned_customers by default
+                    hasPermission = permission.permission_name === 'view_assigned_customers';
                 } else if (role_type === 'team_leader') {
-                    // Team leaders get view_customer by default
-                    hasPermission = permission.permission_name === 'view_customer';
+                    // Team leaders get view_team_customers by default
+                    hasPermission = permission.permission_name === 'view_team_customers' || permission.permission_name === 'view_assigned_customers';
                 } else if (role_type === 'business_head') {
                     // Business heads get all permissions
                     hasPermission = true;
@@ -143,11 +143,25 @@ export const registerCustomer = async (req, res) => {
 export const getTeams = async (req, res) => {
     let connection;
     try {
+        if (!req.user) {
+            return res.status(401).json({ message: 'Authentication required' });
+        }
+
         const pool = await connectDB();
         connection = await pool.getConnection();
-        const [teams] = await connection.query(
-            'SELECT id, team_name FROM teams ORDER BY team_name'
-        );
+
+        let query = 'SELECT id, team_name FROM teams';
+        let params = [];
+
+        // Filter by company_id for non-super_admin users
+        if (req.user.role !== 'super_admin') {
+            query += ' WHERE company_id = ?';
+            params.push(req.user.company_id);
+        }
+
+        query += ' ORDER BY team_name'; // Ensure ordering is applied after WHERE clause
+
+        const [teams] = await connection.query(query, params);
 
         res.json({
             success: true,
@@ -155,9 +169,9 @@ export const getTeams = async (req, res) => {
         });
     } catch (error) {
         logger.error('Error fetching teams:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            message: 'Failed to fetch teams' 
+            message: 'Failed to fetch teams'
         });
     } finally {
         if (connection) {
@@ -193,9 +207,9 @@ export const loginCustomer = async (req, res) => {
 
         if (users.length === 0) {
             await connection.rollback();
-            return res.status(401).json({ 
+            return res.status(401).json({
                 success: false,
-                message: 'Invalid credentials' 
+                message: 'Invalid credentials'
             });
         }
 
@@ -213,7 +227,7 @@ export const loginCustomer = async (req, res) => {
                 'SELECT login_time FROM login_history WHERE user_id = ? AND is_active = false ORDER BY login_time DESC LIMIT 1',
                 [user.id]
             );
-            
+
             const lastAttemptTime = new Date(lastAttempt[0].login_time);
             const timeElapsed = Date.now() - lastAttemptTime;
             const remainingTime = Math.ceil((180000 - timeElapsed) / 1000);
@@ -256,9 +270,9 @@ export const loginCustomer = async (req, res) => {
                 });
             }
 
-            return res.status(401).json({ 
+            return res.status(401).json({
                 success: false,
-                message: 'Invalid credentials' 
+                message: 'Invalid credentials'
             });
         }
 
@@ -297,6 +311,7 @@ export const loginCustomer = async (req, res) => {
             username: user.username,
             email: user.email,
             role: roleName,
+            company_id: user.company_id || null, // CRITICAL: For multi-tenant isolation
             deviceId,
             sessionId: session.insertId,
             team_id: user.team_id,
@@ -325,9 +340,9 @@ export const loginCustomer = async (req, res) => {
             connection.release();
         }
         logger.error('Login error:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            message: 'An error occurred during login' 
+            message: 'An error occurred during login'
         });
     } finally {
         if (connection) {
@@ -401,7 +416,7 @@ export const fetchCurrentUser = async (req, res) => {
             WHERE u.id = ?
             GROUP BY u.id
         `, [req.user.userId]);
-        
+
         if (users.length === 0) {
             return res.status(404).json({ message: 'User not found' });
         }
@@ -444,7 +459,7 @@ export const forgotPassword = async (req, res) => {
         }
 
         const user = users[0];
-        
+
         // Generate a temporary token (this won't be stored in DB)
         const tempToken = crypto.createHash('sha256')
             .update(user.id + user.email + Date.now().toString())
@@ -494,13 +509,13 @@ export const sendOTP = async (req, res) => {
         const { email } = req.body;
 
         const connection = await connectDB();
-        
+
         // Check if the user exists
         const [users] = await connection.query('SELECT * FROM users WHERE email = ?', [email]);
-        
+
         if (users.length === 0) {
-            return res.status(400).json({ 
-                message: 'The email address you entered is not associated with an account.' 
+            return res.status(400).json({
+                message: 'The email address you entered is not associated with an account.'
             });
         }
 
@@ -533,8 +548,8 @@ export const sendOTP = async (req, res) => {
 
         // Send mail using Promise
         await transporter.sendMail(mailOptions);
-        return res.status(200).json({ 
-            message: 'Password reset link has been sent to your email. Please check your inbox.' 
+        return res.status(200).json({
+            message: 'Password reset link has been sent to your email. Please check your inbox.'
         });
 
     } catch (error) {
@@ -582,10 +597,10 @@ export const resetPasswordWithToken = async (req, res) => {
 
             try {
                 const connection = await connectDB();
-                
+
                 // Hash the new password
                 const hashedPassword = await bcrypt.hash(newPassword, 10);
-                
+
                 // Update password only - updated_at will be automatically updated
                 await connection.query(
                     'UPDATE users SET password = ? WHERE id = ?',
@@ -638,10 +653,10 @@ export const resetPassword = async (req, res) => {
 
             try {
                 const connection = await connectDB();
-                
+
                 // Hash the new password
                 const hashedPassword = await bcrypt.hash(newPassword, 10);
-                
+
                 // Update password using the email from the token
                 await connection.query(
                     'UPDATE users SET password = ? WHERE email = ?',

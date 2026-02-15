@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import axios from "axios";
+import api from "../../../../utils/api";
 import { jwtDecode } from "jwt-decode";
 import { getDeviceId } from "../../../../utils/device";
 import "./Login.css";
@@ -21,7 +21,7 @@ const Login = () => {
     // Check if user is locked out
     const checkLockoutStatus = async (email) => {
         if (!email) return;
-        
+
         const lockedUntil = localStorage.getItem(`lockout_${email}`);
         if (lockedUntil) {
             const remainingTime = Math.ceil((parseInt(lockedUntil) - Date.now()) / 1000);
@@ -37,7 +37,7 @@ const Login = () => {
 
     const startLockoutTimer = (duration, email) => {
         setLockoutTimer(duration);
-        
+
         const timer = setInterval(() => {
             setLockoutTimer(prev => {
                 if (prev <= 1) {
@@ -56,12 +56,12 @@ const Login = () => {
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData({ ...formData, [name]: value });
-        
+
         // Check lockout status when email changes
         if (name === 'email') {
             checkLockoutStatus(value);
         }
-        
+
         // Clear error when user starts typing
         setError(null);
     };
@@ -69,7 +69,7 @@ const Login = () => {
     // Function to validate form inputs
     const validateForm = () => {
         const { email, password } = formData;
-        if (!email || !password ) {
+        if (!email || !password) {
             setError('Please fill in all the required fields');
             return false;
         }
@@ -82,36 +82,46 @@ const Login = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        console.log('🔵 Login form submitted');
+        console.log('📧 Email:', formData.email);
+        console.log('🔒 Password length:', formData.password.length);
 
         // Validation checks
-        if (!validateForm()) return;
+        if (!validateForm()) {
+            console.log('❌ Validation failed');
+            return;
+        }
+        console.log('✅ Validation passed');
 
         if (isLocked) {
+            console.log('🔒 Account is locked');
             setError(`Account locked. Try again in ${lockoutTimer} seconds`);
             return;
         }
 
+        console.log('🚀 Starting login API call...');
         setLoading(true);
-        
+
         try {
             // Clear any existing tokens first
             localStorage.removeItem('token');
             localStorage.removeItem('user');
-            
-            const apiUrl = process.env.REACT_APP_API_URL;
+
             const deviceId = getDeviceId();
-            
-            const response = await axios.post(`${apiUrl}/login`, formData, {
+            console.log('📱 Device ID:', deviceId);
+
+            const response = await api.post('/login', formData, {
                 headers: {
                     'x-device-id': deviceId
                 }
             });
-            
+            console.log('✅ Login API response:', response.data);
+
             if (response.data && response.data.token) {
                 // Parse token to get role and permissions
                 const tokenData = jwtDecode(response.data.token);
                 console.log('Token data:', tokenData);
-                
+
                 // Get default permissions based on role
                 const defaultPermissions = {
                     create_customer: ['super_admin', 'it_admin'].includes(tokenData.role),
@@ -130,6 +140,7 @@ const Login = () => {
                     username: tokenData.username,
                     email: tokenData.email,
                     role: tokenData.role,
+                    company_id: tokenData.company_id || null, // CRITICAL: For multi-tenant isolation
                     team_id: tokenData.team_id,
                     // Combine role-based and token permissions
                     permissions: defaultPermissions,
@@ -138,40 +149,37 @@ const Login = () => {
                 };
 
                 console.log('Storing user data:', userData);
-                
+
                 // Store token and user data
                 localStorage.setItem('token', response.data.token);
                 localStorage.setItem('user', JSON.stringify(userData));
                 localStorage.setItem('needsReload', 'true');
-                
-                // Navigate based on user role and then reload the page
-                if (tokenData.role === 'super_admin' || tokenData.role === 'it_admin') {
+
+                // Navigate based on user role
+                if (tokenData.role === 'super_admin') {
+                    navigate('/super-admin/dashboard', { replace: true });
+                } else if (tokenData.role === 'business_head') {
                     navigate('/admin', { replace: true });
                 } else if (tokenData.role === 'mis') {
                     navigate('/upload', { replace: true });
                 } else {
                     navigate('/customers', { replace: true });
                 }
-                
-                // Set a small timeout to ensure navigation completes before reload
-                setTimeout(() => {
-                    window.location.reload();
-                }, 100);
             } else {
                 throw new Error('Invalid response from server');
             }
         } catch (error) {
             console.error("Error during login:", error);
-            
+
             // Handle lockout
             if (error.response?.status === 429) {
                 const { remainingTime } = error.response.data;
                 setIsLocked(true);
-                
+
                 // Store lockout expiry time
                 const lockoutExpiry = Date.now() + (remainingTime * 1000);
                 localStorage.setItem(`lockout_${formData.email}`, lockoutExpiry.toString());
-                
+
                 // Start countdown timer
                 startLockoutTimer(remainingTime, formData.email);
                 setError(`Too many failed attempts. Try again in ${remainingTime} seconds`);
@@ -208,29 +216,29 @@ const Login = () => {
                     )}
                     <form onSubmit={handleSubmit}>
                         <label>Email</label>
-                        <input 
-                            type="email"    
-                            name="email" 
+                        <input
+                            type="email"
+                            name="email"
                             placeholder="Enter email"
-                            value={formData.email} 
-                            onChange={handleInputChange} 
+                            value={formData.email}
+                            onChange={handleInputChange}
                             disabled={isLocked}
                             className={isLocked ? 'input-locked' : ''}
-                            required 
+                            required
                         />
-                        
+
                         <label>Password</label>
-                        <input 
-                            type="password" 
-                            name="password" 
+                        <input
+                            type="password"
+                            name="password"
                             placeholder="Enter password"
-                            value={formData.password} 
-                            onChange={handleInputChange} 
+                            value={formData.password}
+                            onChange={handleInputChange}
                             disabled={isLocked}
                             className={isLocked ? 'input-locked' : ''}
-                            required 
+                            required
                         />
-                        
+
                         <button type="submit">Login</button>
                         <div className="forgot-password-link">
                             <Link to="/forgot-password">Forgot Password</Link>

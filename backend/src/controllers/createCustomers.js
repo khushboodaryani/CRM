@@ -5,7 +5,7 @@ import connectDB from '../db/index.js';
 // Helper function to format date
 const formatDate = (dateStr) => {
     if (!dateStr) return null;
-    
+
     // Convert to string and trim
     const strDate = String(dateStr).trim();
     if (!strDate) return null;
@@ -17,7 +17,7 @@ const formatDate = (dateStr) => {
             // Excel date starting point (December 30, 1899)
             const excelEpoch = new Date(1899, 11, 30);
             const date = new Date(excelEpoch.getTime() + (numericDate * 24 * 60 * 60 * 1000));
-            
+
             // Validate the resulting date
             if (!isNaN(date.getTime()) && date.getFullYear() >= 2000 && date.getFullYear() <= 2100) {
                 return date.toISOString().slice(0, 10);
@@ -31,8 +31,8 @@ const formatDate = (dateStr) => {
             const month = parseInt(parts[1], 10);
             const year = parseInt(parts[2], 10);
 
-            if (day > 0 && day <= 31 && 
-                month > 0 && month <= 12 && 
+            if (day > 0 && day <= 31 &&
+                month > 0 && month <= 12 &&
                 year >= 2000 && year <= 2100) {
                 const paddedDay = day.toString().padStart(2, '0');
                 const paddedMonth = month.toString().padStart(2, '0');
@@ -165,8 +165,8 @@ export const makeNewRecord = async (req, res) => {
             const [existRecords] = await connection.query(`
                 SELECT phone_no, email_id
                 FROM customers 
-                WHERE ${conditions.join(' OR ')}
-            `, params);
+                WHERE company_id = ? AND (${conditions.join(' OR ')})
+            `, [req.user.company_id, ...params]);
 
             // Check which fields are in use and push appropriate messages
             if (existRecords.length > 0) {
@@ -223,53 +223,44 @@ export const makeNewRecord = async (req, res) => {
         const [lastIdResult] = await connection.query(
             'SELECT C_unique_id FROM customers ORDER BY CAST(SUBSTRING(C_unique_id, 4) AS UNSIGNED) DESC LIMIT 1'
         );
-        
+
         const lastId = lastIdResult[0]?.C_unique_id || 'FF_0';
         const lastNumericPart = parseInt(lastId.split('_')[1]) || 0;
         const nextUniqueId = `FF_${lastNumericPart + 1}__1`;
 
-        const sql = `INSERT INTO customers (
-            first_name, last_name, company_name, phone_no, email_id, address,
-            lead_source, call_date_time, call_status, call_outcome, call_recording,
-            product, budget, decision_making, decision_time, lead_stage,
-            next_follow_up, assigned_agent, reminder_notes, priority_level,
-            customer_category, tags_labels, communcation_channel, deal_value,
-            conversion_status, customer_history, comment, scheduled_at, agent_name, C_unique_id
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        // --- Dynamic Fields Handling ---
+        // Fetch all columns from the table to identify custom fields
+        const [dbColumns] = await connection.query('SHOW COLUMNS FROM customers');
+        const dbColumnNames = dbColumns.map(c => c.Field);
 
-        const values = [
-            validatedData.first_name,
-            validatedData.last_name,
-            validatedData.company_name,
-            validatedData.phone_no,
-            validatedData.email_id,
-            validatedData.address,
-            validatedData.lead_source,
-            validatedData.call_date_time,
-            validatedData.call_status,
-            validatedData.call_outcome,
-            validatedData.call_recording,
-            validatedData.product,
-            validatedData.budget,
-            validatedData.decision_making,
-            validatedData.decision_time,
-            validatedData.lead_stage,
-            validatedData.next_follow_up,
-            validatedData.assigned_agent,
-            validatedData.reminder_notes,
-            validatedData.priority_level,
-            validatedData.customer_category,
-            validatedData.tags_labels,
-            validatedData.communcation_channel,
-            validatedData.deal_value,
-            validatedData.conversion_status,
-            validatedData.customer_history,
-            validatedData.comment,
-            validatedData.scheduled_at,
-            validatedData.agent_name,
-            nextUniqueId
+        // Define system/ignored fields that shouldn't be auto-mapped from body
+        const ignoredFields = [
+            'id', 'created_at', 'updated_at', 'last_updated',
+            'company_id', 'C_unique_id', // Handled explicitly
+            ...Object.keys(validatedData) // Already validated standard fields
         ];
+
+        // Add custom fields from req.body to validatedData if they exist in DB columns
+        dbColumnNames.forEach(col => {
+            if (!ignoredFields.includes(col) && req.body[col] !== undefined) {
+                // We accept the value as-is for custom fields (or add basic sanitization if needed)
+                // For now, passing raw value is acceptable as utilizing parameterized queries prevents SQLi
+                validatedData[col] = req.body[col];
+            }
+        });
+
+        // Add system managed fields to data object for query construction
+        validatedData.company_id = req.user.company_id;
+        validatedData.C_unique_id = nextUniqueId;
+
+        // Construct dynamic Insert SQL
+        const insertColumns = Object.keys(validatedData);
+        const insertValues = Object.values(validatedData);
+
+        const sql = `INSERT INTO customers (${insertColumns.join(', ')}) 
+                     VALUES (${insertColumns.map(() => '?').join(', ')})`;
+
+        const values = insertValues;
 
         // Begin transaction
         await connection.beginTransaction();
@@ -393,9 +384,8 @@ const handleDuplicate = async (connection, customerData, existingRecord, action)
             const columnNames = columns.map(col => col.Field)
                 .filter(name => !['id', 'C_unique_id', 'date_created', 'last_updated', 'scheduled_at'].includes(name));
 
-            const updateQuery = `UPDATE customers SET ${
-                columnNames.map(col => `${col} = ?`).join(', ')
-            }, last_updated = NOW() WHERE id = ?`;
+            const updateQuery = `UPDATE customers SET ${columnNames.map(col => `${col} = ?`).join(', ')
+                }, last_updated = NOW() WHERE id = ?`;
 
             const values = columnNames.map(colName => {
                 return customerData[colName] || null;
@@ -406,7 +396,7 @@ const handleDuplicate = async (connection, customerData, existingRecord, action)
 
             // Execute the update
             await connection.query(updateQuery, values);
-            
+
             // Return the existing record with its C_unique_id preserved
             customerData.C_unique_id = existingRecord.C_unique_id;
             return { success: true, data: customerData, replaced: true };
@@ -415,13 +405,13 @@ const handleDuplicate = async (connection, customerData, existingRecord, action)
         if (action === 'append') {
             // Get the base C_unique_id from the existing record
             const baseId = existingRecord.C_unique_id.split('__')[0];
-            
+
             // Find all records with this base ID to determine next suffix
             const [suffixResults] = await connection.query(
                 'SELECT C_unique_id FROM customers WHERE C_unique_id LIKE ? OR C_unique_id = ? ORDER BY CAST(SUBSTRING_INDEX(C_unique_id, "__", -1) AS UNSIGNED) DESC LIMIT 1',
                 [`${baseId}__%`, baseId]
             );
-            
+
             let newCUniqueId;
             if (suffixResults.length === 0 || suffixResults[0].C_unique_id === baseId) {
                 // No suffixed records exist yet
@@ -476,11 +466,11 @@ export const createCustomer = async (req, res) => {
 
             // Handle duplicate based on specified action
             const handleResult = await handleDuplicate(connection, customerData, duplicates.existing_record, duplicateAction);
-            
+
             if (!handleResult.success) {
                 return res.status(400).json({ message: handleResult.message });
             }
-            
+
             // If the record was replaced, we don't need to insert a new one
             if (handleResult.replaced) {
                 await connection.commit();
@@ -491,7 +481,7 @@ export const createCustomer = async (req, res) => {
                     C_unique_id: duplicates.existing_record.C_unique_id
                 });
             }
-            
+
             customerData = handleResult.data;
         }
 
@@ -501,69 +491,64 @@ export const createCustomer = async (req, res) => {
             const [lastIdResult] = await connection.query(
                 'SELECT C_unique_id FROM customers ORDER BY CAST(SUBSTRING(C_unique_id, 4) AS UNSIGNED) DESC LIMIT 1'
             );
-            
+
             const lastId = lastIdResult[0]?.C_unique_id || 'FF_0';
             const lastNumericPart = parseInt(lastId.split('_')[1]) || 0;
             nextId = `FF_${lastNumericPart + 1}`;
         } else {
             nextId = customerData.C_unique_id; // Use the ID generated by handleDuplicate
         }
-    
+
+        // --- Dynamic Fields Handling ---
+        // Fetch all columns from the table to identify which fields exist
+        const [dbColumns] = await connection.query('SHOW COLUMNS FROM customers');
+        const dbColumnNames = dbColumns.map(c => c.Field);
+
+        // Define system/ignored fields that shouldn't be auto-mapped from body
+        const ignoredFields = [
+            'id', 'created_at', 'updated_at', 'last_updated'
+        ];
+
+        // Build the data object with all available fields
+        const insertData = {
+            company_id: req.user.company_id,
+            C_unique_id: nextId
+        };
+
+        // Add all fields from customerData that exist in the database
+        dbColumnNames.forEach(col => {
+            if (!ignoredFields.includes(col) && col !== 'company_id' && col !== 'C_unique_id') {
+                if (customerData[col] !== undefined) {
+                    insertData[col] = customerData[col] || null;
+                } else {
+                    // Set default for agent_name if not provided
+                    if (col === 'agent_name') {
+                        insertData[col] = req.user.username;
+                    }
+                }
+            }
+        });
+
+        // Construct dynamic INSERT SQL
+        const insertColumns = Object.keys(insertData);
+        const insertValues = Object.values(insertData);
+
+        const sql = `INSERT INTO customers (${insertColumns.join(', ')}) 
+                     VALUES (${insertColumns.map(() => '?').join(', ')})`;
+
         // Insert new customer
-        const [result] = await connection.query(
-            `INSERT INTO customers (
-                first_name, last_name, company_name, phone_no, email_id, address,
-                lead_source, call_date_time, call_status, call_outcome, call_recording,
-                product, budget, decision_making, decision_time, lead_stage,
-                next_follow_up, assigned_agent, reminder_notes, priority_level,
-                customer_category, tags_labels, communcation_channel, deal_value,
-                conversion_status, customer_history, comment, scheduled_at, agent_name, C_unique_id
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-                customerData.first_name || null,
-                customerData.last_name || null,
-                customerData.company_name || null,
-                customerData.phone_no || null,
-                customerData.email_id || null,
-                customerData.address || null,
-                customerData.lead_source || null,
-                customerData.call_date_time || null,
-                customerData.call_status || null,
-                customerData.call_outcome || null,
-                customerData.call_recording || null,
-                customerData.product || null,
-                customerData.budget || null,
-                customerData.decision_making || null,
-                customerData.decision_time || null,
-                customerData.lead_stage || null,
-                customerData.next_follow_up || null,
-                customerData.assigned_agent || null,
-                customerData.reminder_notes || null,
-                customerData.priority_level || null,
-                customerData.customer_category || null,
-                customerData.tags_labels || null,
-                customerData.communcation_channel || null,
-                customerData.deal_value || null,
-                customerData.conversion_status || null,
-                customerData.customer_history || null,
-                customerData.comment || null,
-                customerData.scheduled_at || null,
-                customerData.agent_name || req.user.username,
-                nextId
-            ]
-        );
-      
-    
+        const [result] = await connection.query(sql, insertValues);
+
+
         await connection.commit();
-    
+
         res.json({
             success: true,
             message: 'Customer created successfully',
             customerId: result.insertId,
             C_unique_id: nextId
         });
-    
+
     } catch (error) {
         await connection.rollback();
         console.error('Error creating customer:', error);

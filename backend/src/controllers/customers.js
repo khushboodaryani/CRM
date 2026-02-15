@@ -1,6 +1,6 @@
 // src/controllers/customers.js
 
-import connectDB from '../db/index.js';  
+import connectDB from '../db/index.js';
 
 export const searchCustomers = async (req, res) => {
   const { query } = req.query;
@@ -21,39 +21,48 @@ export const searchCustomers = async (req, res) => {
 
     const searchParam = `%${query}%`;
     const searchFields = [
-      'c.first_name', 'c.last_name', 'c.company_name', 'c.phone_no', 
-      'c.email_id', 'c.address', 'c.lead_source', 'c.call_status', 
+      'c.first_name', 'c.last_name', 'c.company_name', 'c.phone_no',
+      'c.email_id', 'c.address', 'c.lead_source', 'c.call_status',
       'c.call_outcome', 'c.product', 'c.budget', 'c.decision_making',
       'c.decision_time', 'c.lead_stage', 'c.assigned_agent', 'c.priority_level',
       'c.customer_category', 'c.tags_labels', 'c.communcation_channel', 'c.deal_value',
-      'c.conversion_status', 'c.customer_history', 'c.agent_name', 'c.C_unique_id', 
+      'c.conversion_status', 'c.customer_history', 'c.agent_name', 'c.C_unique_id',
       'c.comment', 'c.last_updated', 'c.id'
     ];
 
     const searchConditions = searchFields.map(field => `${field} LIKE ?`).join(' OR ');
 
     // Build the base query with role-based access control
-    if (userRole === 'team_leader') {
-      sql = `
-        SELECT DISTINCT c.* 
-        FROM customers c
-        INNER JOIN users u ON c.agent_name = u.username
-        WHERE u.team_id = ? AND (${searchConditions})
-      `;
-      params = [req.user.team_id, ...searchFields.map(() => searchParam)];
-    } else if (userRole === 'user') {
-      sql = `
-        SELECT c.* FROM customers c
-        WHERE c.agent_name = ? AND (${searchConditions})
-      `;
-      params = [req.user.username, ...searchFields.map(() => searchParam)];
-    } else if (['super_admin', 'it_admin', 'business_head'].includes(userRole.toLowerCase())) {
-      // Admins can search all records
+    if (userRole === 'super_admin') {
+      // Super admin can search ALL customers from ALL companies
       sql = `
         SELECT c.* FROM customers c
         WHERE ${searchConditions}
       `;
       params = searchFields.map(() => searchParam);
+    } else if (userRole === 'business_head') {
+      // Business Head can search ALL customers from THEIR company
+      sql = `
+        SELECT c.* FROM customers c
+        WHERE c.company_id = ? AND (${searchConditions})
+      `;
+      params = [req.user.company_id, ...searchFields.map(() => searchParam)];
+    } else if (userRole === 'team_leader') {
+      // Team leaders search their team's customers within their company
+      sql = `
+        SELECT DISTINCT c.* 
+        FROM customers c
+        INNER JOIN users u ON c.agent_name = u.username
+        WHERE u.team_id = ? AND c.company_id = ? AND (${searchConditions})
+      `;
+      params = [req.user.team_id, req.user.company_id, ...searchFields.map(() => searchParam)];
+    } else if (userRole === 'user') {
+      // Regular users search only their assigned customers within their company
+      sql = `
+        SELECT c.* FROM customers c
+        WHERE c.agent_name = ? AND c.company_id = ? AND (${searchConditions})
+      `;
+      params = [req.user.username, req.user.company_id, ...searchFields.map(() => searchParam)];
     } else {
       return res.status(403).json({ message: 'Unauthorized role' });
     }
@@ -62,7 +71,7 @@ export const searchCustomers = async (req, res) => {
     sql += ' ORDER BY c.last_updated DESC LIMIT 100';
 
     const [results] = await connection.execute(sql, params);
-    
+
     return res.json({
       success: true,
       data: results,
@@ -82,11 +91,11 @@ export const getAllCustomers = async (req, res) => {
   let connection;
   try {
     console.log('Request user:', req.user);
-    
+
     if (!req.user || !req.user.userId) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        message: 'Authentication required' 
+        message: 'Authentication required'
       });
     }
 
@@ -105,35 +114,48 @@ export const getAllCustomers = async (req, res) => {
        WHERE up.user_id = ? AND up.value = true`,
       [req.user.userId]
     );
-    
+
     const userPermissions = permissions.map(p => p.permission_name);
     console.log('User permissions:', userPermissions);
 
     // Build query based on user role and permissions
     if (userRole === 'super_admin') {
+      // Super admin sees ALL customers from ALL companies
       sql = 'SELECT * FROM customers ORDER BY last_updated DESC';
       params = [];
+    } else if (userRole === 'business_head') {
+      // Business Head sees ALL customers from THEIR company only
+      sql = `
+        SELECT * FROM customers 
+        WHERE company_id = ?
+        ORDER BY last_updated DESC
+      `;
+      params = [req.user.company_id];
     } else if (userRole === 'team_leader' && userPermissions.includes('view_team_customers')) {
-      // Team leaders see their team's customers
+      // Team leaders see their team's customers within their company
       sql = `
         SELECT c.* FROM customers c
         JOIN users u ON (c.agent_name = u.username)
-        WHERE u.team_id = ?
+        WHERE u.team_id = ? AND c.company_id = ?
         ORDER BY c.last_updated DESC, c.id DESC
       `;
-      params = [req.user.team_id];
+      params = [req.user.team_id, req.user.company_id];
     } else if (userRole === 'user' && userPermissions.includes('view_assigned_customers')) {
-      // Regular users see only their assigned customers
+      // Regular users see only their assigned customers within their company
       sql = `
         SELECT * FROM customers 
-        WHERE agent_name = ?
+        WHERE agent_name = ? AND company_id = ?
         ORDER BY last_updated DESC
       `;
-      params = [req.user.username];
+      params = [req.user.username, req.user.company_id];
     } else {
-      // Default case - users with view_customer permission see all customers
-      sql = 'SELECT * FROM customers ORDER BY last_updated DESC';
-      params = [];
+      // Default case - users with view_customer permission see all customers in their company
+      sql = `
+        SELECT * FROM customers 
+        WHERE company_id = ?
+        ORDER BY last_updated DESC
+      `;
+      params = [req.user.company_id];
     }
 
     console.log('Executing SQL:', sql, 'with params:', params);
@@ -196,14 +218,26 @@ export const viewCustomer = async (req, res) => {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    const connection = await connectDB(); 
+    const connection = await connectDB();
 
-    // SQL query to retrieve customer details by unique ID
-    const query = `SELECT * FROM customers WHERE C_unique_id = ? ORDER BY last_updated DESC, id DESC`;
-    const [rows] = await connection.execute(query, [uniqueId]);
+    // SQL query to retrieve customer details by unique ID with company isolation
+    let query;
+    let params;
+
+    if (req.user.role === 'super_admin') {
+      // Super admin can view any customer from any company
+      query = `SELECT * FROM customers WHERE C_unique_id = ? ORDER BY last_updated DESC, id DESC`;
+      params = [uniqueId];
+    } else {
+      // All other users can only view customers from their company
+      query = `SELECT * FROM customers WHERE C_unique_id = ? AND company_id = ? ORDER BY last_updated DESC, id DESC`;
+      params = [uniqueId, req.user.company_id];
+    }
+
+    const [rows] = await connection.execute(query, params);
 
     if (rows.length === 0) {
-      return res.status(404).json({ message: 'Customer not found' });
+      return res.status(404).json({ message: 'Customer not found or access denied' });
     }
 
     res.status(200).json(rows[0]); // Return the first (and should be only) customer found
@@ -218,47 +252,58 @@ export const viewCustomer = async (req, res) => {
 // ***********
 // Function to get list of users for agent assignment
 export const getUsers = async (req, res) => {
-    try {
-        // Check if user exists in request
-        if (!req.user) {
-          return res.status(401).json({ message: 'Authentication required' });
-        }
+  try {
+    // Check if user exists in request
+    if (!req.user) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
 
-        const connection = await connectDB();
-        let query;
-        let params = [];
+    const connection = await connectDB();
+    let query;
+    let params = [];
 
-        // If team_leader, only show users from their team
-        if (req.user.role === 'team_leader' && req.user.team_id) {
-            query = `
+    // If team_leader, only show users from their team within their company
+    if (req.user.role === 'team_leader' && req.user.team_id) {
+      query = `
                 SELECT u.id, u.username, u.role
                 FROM users u
                 WHERE u.username IS NOT NULL
                 AND u.team_id = ?
+                AND u.company_id = ?
                 ORDER BY u.username
             `;
-            params = [req.user.team_id];
-        } else {
-            // Super_Admin can see all users
-            query = `
+      params = [req.user.team_id, req.user.company_id];
+    } else if (req.user.role === 'super_admin') {
+      // Super_Admin can see all users from all companies
+      query = `
                 SELECT id, username, role
                 FROM users 
                 WHERE username IS NOT NULL
                 ORDER BY username
             `;
-        }
-        
-        // Execute query and send response
-        const [users] = await connection.execute(query, params);
-        res.json(users);
-
-    } catch (error) {
-        console.error('Error fetching users:', error);
-        res.status(500).json({ 
-            message: 'Failed to fetch users',
-            error: error.message
-        });
+    } else {
+      // Business Head and other roles see only users from their company
+      query = `
+                SELECT id, username, role
+                FROM users 
+                WHERE username IS NOT NULL
+                AND company_id = ?
+                ORDER BY username
+            `;
+      params = [req.user.company_id];
     }
+
+    // Execute query and send response
+    const [users] = await connection.execute(query, params);
+    res.json(users);
+
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({
+      message: 'Failed to fetch users',
+      error: error.message
+    });
+  }
 };
 
 // New function to assign customer to team
@@ -306,7 +351,7 @@ export const assignCustomerToTeam = async (req, res) => {
       const teamLeaderTeamId = req.user.team_id;
 
       if (!teamLeaderTeamId) {
-        return res.status(403).json({ 
+        return res.status(403).json({
           error: 'Team leader team information not found',
           details: {
             user: req.user.username,
@@ -316,7 +361,7 @@ export const assignCustomerToTeam = async (req, res) => {
       }
 
       if (agent.team_id !== teamLeaderTeamId) {
-        return res.status(403).json({ 
+        return res.status(403).json({
           error: 'Cannot assign customers to users outside your team',
           details: {
             user: req.user.username,
@@ -336,12 +381,12 @@ export const assignCustomerToTeam = async (req, res) => {
         [customer_ids]
       );
 
-      const invalidCustomers = customerAgents.filter(c => 
+      const invalidCustomers = customerAgents.filter(c =>
         c.agent_name !== null && c.team_id !== null && c.team_id !== teamLeaderTeamId
       );
 
       if (invalidCustomers.length > 0) {
-        return res.status(403).json({ 
+        return res.status(403).json({
           error: 'Some customers are already assigned to other teams',
           details: {
             invalidCustomerIds: invalidCustomers.map(c => c.id)
@@ -389,9 +434,9 @@ export const assignCustomerToTeam = async (req, res) => {
 
   } catch (error) {
     console.error('Error assigning customers:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Internal server error',
-      message: error.message 
+      message: error.message
     });
   } finally {
     if (connection) {
@@ -444,64 +489,64 @@ export const getTeams = async (req, res) => {
 
 // Add this new function to check for duplicates
 export const checkDuplicates = async (req, res) => {
-    try {
-        const connection = await connectDB();
-        const { currentCustomerId, phone_no, email_id } = req.body;
-        
-        const conditions = [];
-        const params = [currentCustomerId]; // Start with customerId for the != condition
-        const duplicates = [];
+  try {
+    const connection = await connectDB();
+    const { currentCustomerId, phone_no, email_id } = req.body;
 
-        // Helper to check if value is non-null and non-empty
-        const isValidValue = (value) => {
-            return value !== null && value !== undefined && value.toString().trim() !== '';
-        };
+    const conditions = [];
+    const params = [currentCustomerId]; // Start with customerId for the != condition
+    const duplicates = [];
 
-        // Add conditions for each field that needs to be checked
-        if (isValidValue(phone_no)) {
-            conditions.push('(phone_no = ? AND phone_no IS NOT NULL AND phone_no != "")');
-            params.push(phone_no);
-        }
+    // Helper to check if value is non-null and non-empty
+    const isValidValue = (value) => {
+      return value !== null && value !== undefined && value.toString().trim() !== '';
+    };
 
-        if (isValidValue(email_id)) {
-            conditions.push('(email_id = ? AND email_id IS NOT NULL AND email_id != "")');
-            params.push(email_id);
-        }
+    // Add conditions for each field that needs to be checked
+    if (isValidValue(phone_no)) {
+      conditions.push('(phone_no = ? AND phone_no IS NOT NULL AND phone_no != "")');
+      params.push(phone_no);
+    }
 
-        if (conditions.length > 0) {
-            const [existRecords] = await connection.query(`
+    if (isValidValue(email_id)) {
+      conditions.push('(email_id = ? AND email_id IS NOT NULL AND email_id != "")');
+      params.push(email_id);
+    }
+
+    if (conditions.length > 0) {
+      const [existRecords] = await connection.query(`
                 SELECT id, phone_no, email_id, first_name
                 FROM customers 
                 WHERE id != ? AND (${conditions.join(' OR ')})
             `, params);
 
-            // Check which fields are in use and push detailed error messages
-            if (existRecords.length > 0) {
-                existRecords.forEach(record => {
-                    const customerInfo = `${record.first_name} `;
-                    
-                    if (isValidValue(phone_no) && isValidValue(record.phone_no) && record.phone_no === phone_no) {
-                        duplicates.push(`Phone number ${phone_no} is already registered with customer ${customerInfo}`);
-                    }
-                    if (isValidValue(email_id) && isValidValue(record.email_id) && record.email_id === email_id) {
-                        duplicates.push(`Email ID ${email_id} is already registered with customer ${customerInfo}`);
-                    }
-                });
-            }
-        }
+      // Check which fields are in use and push detailed error messages
+      if (existRecords.length > 0) {
+        existRecords.forEach(record => {
+          const customerInfo = `${record.first_name} `;
 
-        res.status(200).json({
-            duplicates,
-            hasDuplicates: duplicates.length > 0
+          if (isValidValue(phone_no) && isValidValue(record.phone_no) && record.phone_no === phone_no) {
+            duplicates.push(`Phone number ${phone_no} is already registered with customer ${customerInfo}`);
+          }
+          if (isValidValue(email_id) && isValidValue(record.email_id) && record.email_id === email_id) {
+            duplicates.push(`Email ID ${email_id} is already registered with customer ${customerInfo}`);
+          }
         });
-
-    } catch (error) {
-        console.error('Error checking duplicates:', error);
-        res.status(500).json({ 
-            message: 'Error checking for duplicates', 
-            error: error.message 
-        });
+      }
     }
+
+    res.status(200).json({
+      duplicates,
+      hasDuplicates: duplicates.length > 0
+    });
+
+  } catch (error) {
+    console.error('Error checking duplicates:', error);
+    res.status(500).json({
+      message: 'Error checking for duplicates',
+      error: error.message
+    });
+  }
 };
 
 // ****************
@@ -510,77 +555,77 @@ export const checkDuplicates = async (req, res) => {
 export const getTeamRecords = async (req, res) => {
   let connection;
   try {
-      const pool = await connectDB();
-      connection = await pool.getConnection();
-      
-      const team_leader = req.params.team_leader;
-      if (!team_leader) {
-          connection.release();
-          return res.status(400).json({
-              success: false,
-              message: "Team leader name is required"
-          });
-      }
+    const pool = await connectDB();
+    connection = await pool.getConnection();
 
-      // For admin users (IT_ADMIN, BUSINESS_HEAD), allow access to any team's records
-      // For team leaders, only allow access to their own team's records
-      if (req.user.role.toLowerCase() === 'team_leader' && 
-          req.user.username.toLowerCase() !== team_leader.toLowerCase()) {
-          connection.release();
-          return res.status(403).json({
-              success: false,
-              message: "Access denied. You can only view your own team's records."
-          });
-      }
-      
-      // Query records for the specified team leader
-      const query = `
+    const team_leader = req.params.team_leader;
+    if (!team_leader) {
+      connection.release();
+      return res.status(400).json({
+        success: false,
+        message: "Team leader name is required"
+      });
+    }
+
+    // For admin users (IT_ADMIN, BUSINESS_HEAD), allow access to any team's records
+    // For team leaders, only allow access to their own team's records
+    if (req.user.role.toLowerCase() === 'team_leader' &&
+      req.user.username.toLowerCase() !== team_leader.toLowerCase()) {
+      connection.release();
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. You can only view your own team's records."
+      });
+    }
+
+    // Query records for the specified team leader
+    const query = `
           SELECT first_name, phone_no, email_id, assigned_agent 
           FROM customers 
           WHERE assigned_agent = ?
           ORDER BY last_updated DESC, id DESC
       `;
-      
-      const [records] = await connection.query(query, [team_leader]);
 
-      // Check if request body is empty
-      const hasBody = req.body && Object.keys(req.body).length > 0;
-      
-      // If no body, return records directly
-      if (!hasBody) {
-        connection.release();
-        return res.status(200).json({
-          success: true,
-          count: records.length,
-          data: records
-        });
-      }
+    const [records] = await connection.query(query, [team_leader]);
 
-      // If body exists, apply field mapping
-      const { first_name = "first_name", number = "phone_no" } = req.body;
-      const mappedRecords = records.map(record => ({
-        [first_name]: record.first_name,
-        [number]: record.phone_no,
-        priority: "1"
-      }));
+    // Check if request body is empty
+    const hasBody = req.body && Object.keys(req.body).length > 0;
 
+    // If no body, return records directly
+    if (!hasBody) {
       connection.release();
       return res.status(200).json({
         success: true,
-        count: mappedRecords.length,
-        data: mappedRecords
+        count: records.length,
+        data: records
       });
+    }
+
+    // If body exists, apply field mapping
+    const { first_name = "first_name", number = "phone_no" } = req.body;
+    const mappedRecords = records.map(record => ({
+      [first_name]: record.first_name,
+      [number]: record.phone_no,
+      priority: "1"
+    }));
+
+    connection.release();
+    return res.status(200).json({
+      success: true,
+      count: mappedRecords.length,
+      data: mappedRecords
+    });
 
   } catch (error) {
-      console.error("Error in getTeamRecords:", error);
-      if (connection) {
-          connection.release();
-      }
-      return res.status(500).json({
-        success: false,
-        message: "Internal server error",
-        error: error.message,
-      });
+    console.error("Error in getTeamRecords:", error);
+    if (connection) {
+      connection.release();
+    }
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
   }
 };
 
@@ -588,55 +633,55 @@ export const getTeamRecords = async (req, res) => {
 
 // Function to get customers by last_updated date range
 export const getCustomersByDateRange = async (req, res) => {
-    let connection;
-    try {
-        const { startDate, endDate } = req.query;
-        
-        if (!startDate || !endDate) {
-            return res.status(400).json({
-                success: false,
-                message: 'Start date and end date are required'
-            });
-        }
+  let connection;
+  try {
+    const { startDate, endDate } = req.query;
 
-        // Convert dates to MySQL format
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-        // Set end date to end of day
-        end.setHours(23, 59, 59, 999);
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Start date and end date are required'
+      });
+    }
 
-        const pool = await connectDB();
-        connection = await pool.getConnection();
+    // Convert dates to MySQL format
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    // Set end date to end of day
+    end.setHours(23, 59, 59, 999);
 
-        const [results] = await connection.query(
-            `SELECT * FROM customers 
+    const pool = await connectDB();
+    connection = await pool.getConnection();
+
+    const [results] = await connection.query(
+      `SELECT * FROM customers 
              WHERE last_updated >= ? AND last_updated <= ?
              ORDER BY last_updated DESC`,
-            [start, end]
-        );
+      [start, end]
+    );
 
-        res.json({
-            success: true,
-            data: results,
-            count: results.length,
-            dateRange: {
-                start: start.toISOString(),
-                end: end.toISOString()
-            }
-        });
+    res.json({
+      success: true,
+      data: results,
+      count: results.length,
+      dateRange: {
+        start: start.toISOString(),
+        end: end.toISOString()
+      }
+    });
 
-    } catch (error) {
-        console.error('Error fetching customers by date range:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error fetching customers',
-            error: error.message
-        });
-    } finally {
-        if (connection) {
-            connection.release();
-        }
+  } catch (error) {
+    console.error('Error fetching customers by date range:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching customers',
+      error: error.message
+    });
+  } finally {
+    if (connection) {
+      connection.release();
     }
+  }
 };
 
 // **********

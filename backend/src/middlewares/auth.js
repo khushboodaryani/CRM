@@ -9,7 +9,7 @@ dotenv.config();  // Load environment variables
 export const authenticateToken = async (req, res, next) => {
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.split(' ')[1];
-    
+
     if (!token) {
         return res.status(403).json({ message: "Access denied. No token provided." });
     }
@@ -25,9 +25,9 @@ export const authenticateToken = async (req, res, next) => {
 
         if (!decoded.userId || !decoded.role) {
             console.error('Invalid token payload:', decoded);
-            return res.status(401).json({ 
+            return res.status(401).json({
                 success: false,
-                message: "Invalid token payload" 
+                message: "Invalid token payload"
             });
         }
 
@@ -63,6 +63,7 @@ export const authenticateToken = async (req, res, next) => {
                 username: decoded.username,
                 email: decoded.email,
                 role: decoded.role,
+                company_id: decoded.company_id || null, // CRITICAL: For multi-tenant data isolation
                 team_id: decoded.team_id ? parseInt(decoded.team_id) : null,
                 permissions: currentPermissions // Use current permissions from database
             };
@@ -79,14 +80,14 @@ export const authenticateToken = async (req, res, next) => {
 };
 
 export const checkUploadAccess = (req, res, next) => {
-    if (req.user.role !== 'super_admin' && req.user.role !== 'it_admin' && req.user.role !== 'mis') {
+    if (req.user.role !== 'super_admin' && req.user.role !== 'business_head' && req.user.role !== 'mis') {
         return res.status(403).json({ message: "Access denied. Insufficient permissions." });
     }
     next();
 };
 
 export const checkDownloadAccess = (req, res, next) => {
-    if (req.user.role !== 'super_admin' && req.user.role !== 'it_admin' && req.user.role !== 'mis') {
+    if (req.user.role !== 'super_admin' && req.user.role !== 'business_head' && req.user.role !== 'mis') {
         return res.status(403).json({ message: "Access denied. Insufficient permissions." });
     }
     next();

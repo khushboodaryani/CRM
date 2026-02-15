@@ -11,34 +11,10 @@ const CreateForm = () => {
   const { phone_no } = useParams();
   const [formDataa, setFormData] = useState({
     first_name: '',
-    last_name: '',
-    company_name: '',
     phone_no: '',
-    email_id: '',
-    address: '',
-    lead_source: 'website',
-    call_date_time: '',
-    call_status: 'connected',
-    call_outcome: 'interested',
-    call_recording: '',
-    product: '',
-    budget: '',
-    decision_making: 'yes',
-    decision_time: 'immediate',
-    lead_stage: 'new',
-    next_follow_up: '',
-    assigned_agent: '',
-    reminder_notes: '',
-    priority_level: 'medium',
-    customer_category: 'warm',
-    tags_labels: 'premium_customer',
-    communcation_channel: 'call',
-    deal_value: '',
-    conversion_status: 'lead',
-    customer_history: 'previous calls',
-    comment: '',
     agent_name: ''
   });
+  const [customFields, setCustomFields] = useState([]);
 
   const [formSuccess, setFormSuccess] = useState(false);
   const [error, setError] = useState('');
@@ -59,10 +35,10 @@ const CreateForm = () => {
   // Helper function to prepare form data with IST datetime conversion
   const prepareFormDataForSubmission = (data) => {
     const preparedData = { ...data };
-    
+
     // Convert datetime fields to IST if they exist
     const datetimeFields = ['call_date_time', 'scheduled_at', 'next_follow_up'];
-    
+
     datetimeFields.forEach(field => {
       if (preparedData[field]) {
         // The datetime-local input gives us local time, but we want to ensure it's treated as IST
@@ -71,7 +47,7 @@ const CreateForm = () => {
         preparedData[field] = localDate.toISOString();
       }
     });
-    
+
     return preparedData;
   };
 
@@ -108,12 +84,60 @@ const CreateForm = () => {
     };
 
     fetchUser();
+    fetchCustomFields();
   }, [navigate]);
+
+  const fetchCustomFields = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const apiUrl = process.env.REACT_APP_API_URL;
+
+      const response = await axios.get(`${apiUrl}/custom-fields`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.data.success) {
+        // Define truly system fields that should never be shown
+        const systemFields = [
+          'id', 'created_at', 'updated_at', 'last_updated',
+          'company_id', 'team_id', 'duplicate_action', 'C_unique_id'
+        ];
+
+        // Define mandatory fields that are always shown
+        const mandatoryFields = ['first_name', 'phone_no', 'agent_name'];
+
+        // Get all fields except system fields
+        const allFields = response.data.fields.filter(field =>
+          !systemFields.includes(field.COLUMN_NAME)
+        );
+
+        // Separate custom fields (for the customFields state used in rendering)
+        const custom = allFields.filter(field =>
+          !mandatoryFields.includes(field.COLUMN_NAME)
+        );
+
+        setCustomFields(custom);
+
+        // Initialize ALL fields in form state dynamically
+        setFormData(prev => {
+          const newData = { ...prev };
+          allFields.forEach(field => {
+            if (newData[field.COLUMN_NAME] === undefined) {
+              newData[field.COLUMN_NAME] = field.COLUMN_DEFAULT || '';
+            }
+          });
+          return newData;
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching custom fields:', err);
+    }
+  };
 
   // Handle input changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    
+
     // Special handling for phone numbers
     if (name === 'phone_no' || name === 'whatsapp_num') {
       // Only allow digits and '+' symbol
@@ -126,7 +150,7 @@ const CreateForm = () => {
       }));
       return;
     }
-    
+
     // Special handling for datetime-local
     if (name === 'scheduled_at') {
       // If empty, set to current IST datetime
@@ -167,7 +191,7 @@ const CreateForm = () => {
         return false;
       }
     }
-    
+
     // Validate phone number format
     const phoneRegex = /^[+\d]+$/;
     if (!phoneRegex.test(formDataa.phone_no)) {
@@ -181,7 +205,7 @@ const CreateForm = () => {
       setError("Agent name not found. Please refresh the page or contact support.");
       return false;
     }
-    
+
     return true;
   };
 
@@ -206,9 +230,9 @@ const CreateForm = () => {
 
       // Prepare form data with IST datetime conversion
       const preparedData = prepareFormDataForSubmission(formDataa);
-      
+
       const response = await axios.post(
-        `${apiUrl}/customers/new`, 
+        `${apiUrl}/customers/new`,
         { ...preparedData, duplicateAction: action },
         {
           headers: {
@@ -224,42 +248,17 @@ const CreateForm = () => {
         alert("Record added successfully!");
         setFormData({
           first_name: '',
-          last_name: '',
-          company_name: '',
           phone_no: '',
-          email_id: '',
-          address: '',
-          lead_source: 'website',
-          call_date_time: '',
-          call_status: 'connected',
-          call_outcome: 'interested',
-          call_recording: '',
-          product: '',
-          budget: '',
-          decision_making: 'yes',
-          decision_time: 'immediate',
-          lead_stage: 'new',
-          next_follow_up: '',
-          assigned_agent: '',
-          reminder_notes: '',
-          priority_level: 'medium',
-          customer_category: 'warm',
-          tags_labels: 'premium_customer',
-          communcation_channel: 'call',
-          deal_value: '',
-          conversion_status: 'lead',
-          customer_history: 'previous calls',
-          comment: '',
-          agent_name: formDataa.agent_name,
-          // scheduled_at: ''
+          agent_name: formDataa.agent_name
         });
+        fetchCustomFields(); // Re-fetch to reinitialize all fields
         navigate('/customers');
       }
     } catch (error) {
       if (error.response?.status === 409) {
         // Handle duplicate record
         const duplicateData = error.response.data;
-        
+
         // Store the duplicate info with calculated matching fields
         setDuplicateInfo({
           ...duplicateData,
@@ -269,7 +268,7 @@ const CreateForm = () => {
             email: formDataa.email_id === duplicateData.existing_record.email_id
           }
         });
-        
+
         setShowDuplicateDialog(true);
       } else {
         console.error('Error adding record:', error);
@@ -285,7 +284,7 @@ const CreateForm = () => {
     }
 
     setShowDuplicateDialog(false);
-    handleSubmit({ preventDefault: () => {} }, action);
+    handleSubmit({ preventDefault: () => { } }, action);
   };
 
   return (
@@ -293,10 +292,10 @@ const CreateForm = () => {
       <h2 className="create_form_headiii">New Record</h2>
       <div className="create-form-container">
         {error && <div className="error-messagee">{error}</div>}
-        
+
         {showDuplicateDialog && duplicateInfo && (
-          <Dialog 
-            open={showDuplicateDialog} 
+          <Dialog
+            open={showDuplicateDialog}
             onClose={() => setShowDuplicateDialog(false)}
             maxWidth="md"
             fullWidth
@@ -308,19 +307,19 @@ const CreateForm = () => {
               </IconButton>
             </DialogTitle>
             <DialogContent sx={{ padding: '20px' }}>
-              <Typography variant="body1" sx={{ margin: '5px',color: '#EF6F53', fontWeight: 600}}>
-                {duplicateInfo.phone_no_exists 
-                  ? "Phone number already exists in the system" 
-                  : duplicateInfo.email_exists 
+              <Typography variant="body1" sx={{ margin: '5px', color: '#EF6F53', fontWeight: 600 }}>
+                {duplicateInfo.phone_no_exists
+                  ? "Phone number already exists in the system"
+                  : duplicateInfo.email_exists
                     ? "Email already exists in the system"
                     : "Duplicate record found"}
               </Typography>
-              
+
               <TableContainer sx={{ marginBottom: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', borderRadius: '4px' }}>
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableCell sx={{ 
+                      <TableCell sx={{
                         width: '15%',
                         backgroundColor: '#f5f5f5',
                         fontWeight: 600,
@@ -328,7 +327,7 @@ const CreateForm = () => {
                       }}>
                         Field
                       </TableCell>
-                      <TableCell sx={{ 
+                      <TableCell sx={{
                         width: '42.5%',
                         backgroundColor: '#4CAF50',
                         color: 'white',
@@ -338,7 +337,7 @@ const CreateForm = () => {
                       }}>
                         New Record
                       </TableCell>
-                      <TableCell sx={{ 
+                      <TableCell sx={{
                         width: '42.5%',
                         backgroundColor: '#EF6F53',
                         color: 'white',
@@ -354,8 +353,8 @@ const CreateForm = () => {
                     <TableRow>
                       <TableCell sx={{ backgroundColor: '#fafafa', padding: '5px' }}>Name</TableCell>
                       <TableCell sx={{ backgroundColor: '#f1f8f1', padding: '5px' }}>{formDataa.first_name}</TableCell>
-                      <TableCell sx={{ 
-                        backgroundColor: duplicateInfo.matchingFields.name ? '#ffecb3' : '#fff5f5', 
+                      <TableCell sx={{
+                        backgroundColor: duplicateInfo.matchingFields.name ? '#ffecb3' : '#fff5f5',
                         padding: '5px',
                         fontWeight: duplicateInfo.matchingFields.name ? 'bold' : 'normal'
                       }}>
@@ -366,8 +365,8 @@ const CreateForm = () => {
                     <TableRow>
                       <TableCell sx={{ backgroundColor: '#fafafa', padding: '5px' }}>Phone</TableCell>
                       <TableCell sx={{ backgroundColor: '#f1f8f1', padding: '5px' }}>{formDataa.phone_no}</TableCell>
-                      <TableCell sx={{ 
-                        backgroundColor: duplicateInfo.matchingFields.phone ? '#ffecb3' : '#fff5f5', 
+                      <TableCell sx={{
+                        backgroundColor: duplicateInfo.matchingFields.phone ? '#ffecb3' : '#fff5f5',
                         padding: '5px',
                         fontWeight: duplicateInfo.matchingFields.phone ? 'bold' : 'normal'
                       }}>
@@ -378,8 +377,8 @@ const CreateForm = () => {
                     <TableRow>
                       <TableCell sx={{ backgroundColor: '#fafafa', padding: '5px' }}>Email</TableCell>
                       <TableCell sx={{ backgroundColor: '#f1f8f1', padding: '5px' }}>{formDataa.email_id}</TableCell>
-                      <TableCell sx={{ 
-                        backgroundColor: duplicateInfo.matchingFields.email ? '#ffecb3' : '#fff5f5', 
+                      <TableCell sx={{
+                        backgroundColor: duplicateInfo.matchingFields.email ? '#ffecb3' : '#fff5f5',
                         padding: '5px',
                         fontWeight: duplicateInfo.matchingFields.email ? 'bold' : 'normal'
                       }}>
@@ -390,15 +389,15 @@ const CreateForm = () => {
                   </TableBody>
                 </Table>
               </TableContainer>
-              
+
               <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '15px' }}>
                 <Typography variant="h6" sx={{ margin: 0, fontWeight: 600, fontSize: '1rem', color: '#364C63' }}>Choose Action:</Typography>
-                <select 
+                <select
                   value={duplicateAction}
                   onChange={(e) => setDuplicateAction(e.target.value)}
-                  style={{ 
-                    padding: '2px 8px', 
-                    borderRadius: '6px', 
+                  style={{
+                    padding: '2px 8px',
+                    borderRadius: '6px',
                     border: '1px solid #364C63',
                     fontSize: '0.8rem',
                     fontWeight: 600,
@@ -416,9 +415,9 @@ const CreateForm = () => {
               <Button onClick={() => setShowDuplicateDialog(false)} color="secondary">
                 Cancel
               </Button>
-              <Button 
-                onClick={() => handleDuplicateAction(duplicateAction)} 
-                variant="contained" 
+              <Button
+                onClick={() => handleDuplicateAction(duplicateAction)}
+                variant="contained"
                 color="primary"
               >
                 Confirm
@@ -428,40 +427,41 @@ const CreateForm = () => {
         )}
 
         <form onSubmit={(e) => handleSubmit(e, 'prompt')} className="create-form">
+          {/* Standard Fields Map */}
           {[
-            { 
-              label: "First Name", name: "first_name", required: true 
+            {
+              label: "First Name", name: "first_name", required: true
             },
-            { 
+            {
               label: "Last Name", name: "last_name"
             },
-            { 
+            {
               label: "Company Name", name: "company_name"
             },
-            { 
+            {
               label: "Phone", name: "phone_no", required: true,
               type: "tel", maxLength: "20"
             },
-            { 
+            {
               label: "Email", name: "email_id",
               type: "email"
             },
-            { 
+            {
               label: "Address", name: "address"
             },
-            { 
+            {
               label: "Call Recording", name: "call_recording"
             },
-            { 
+            {
               label: "Product", name: "product"
             },
-            { 
+            {
               label: "Budget", name: "budget"
             },
-            { 
+            {
               label: "Assigned Agent", name: "assigned_agent"
             },
-            { 
+            {
               label: "Deal Value", name: "deal_value"
             },
           ].map(({ label, name, type = "text", maxLength, required }) => (
@@ -477,12 +477,58 @@ const CreateForm = () => {
             </div>
           ))}
 
+          {/* Dynamic Custom Fields */}
+          {customFields.map(field => {
+            const isRequired = field.IS_NULLABLE === 'NO';
+            const label = field.COLUMN_NAME.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+            if (field.DATA_TYPE === 'enum') {
+              // Parse enum values from string "enum('val1','val2')"
+              const options = field.COLUMN_TYPE.match(/'([^']+)'/g)?.map(s => s.replace(/'/g, '')) || [];
+
+              return (
+                <div key={field.COLUMN_NAME} className="label-input">
+                  <label>{label}{isRequired && <span className="required"> *</span>}:</label>
+                  <select
+                    name={field.COLUMN_NAME}
+                    value={formDataa[field.COLUMN_NAME] || ''}
+                    onChange={handleInputChange}
+                    required={isRequired}
+                  >
+                    <option value="">Select {label}</option>
+                    {options.map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+              );
+            }
+
+            let inputType = 'text';
+            if (['int', 'decimal', 'float', 'double'].includes(field.DATA_TYPE)) inputType = 'number';
+            else if (['date'].includes(field.DATA_TYPE)) inputType = 'date';
+            else if (['datetime', 'timestamp'].includes(field.DATA_TYPE)) inputType = 'datetime-local';
+
+            return (
+              <div key={field.COLUMN_NAME} className="label-input">
+                <label>{label}{isRequired && <span className="required"> *</span>}:</label>
+                <input
+                  type={inputType}
+                  name={field.COLUMN_NAME}
+                  value={formDataa[field.COLUMN_NAME] || ''}
+                  onChange={handleInputChange}
+                  required={isRequired}
+                />
+              </div>
+            );
+          })}
+
           {/* Lead Source Dropdown */}
           <div className="label-input">
             <label>Lead Source:</label>
             <select name="lead_source" value={formDataa.lead_source} onChange={handleInputChange}>
               <option value="website">Website</option>
-              <option value="data">Data</option>   
+              <option value="data">Data</option>
               <option value="referral">Referral</option>
               <option value="ads">Ads</option>
             </select>
@@ -615,17 +661,17 @@ const CreateForm = () => {
 
           {/* Schedule Call  */}
           <div className="label-input">
-              <label>Next Follow Up:</label>
-              <input
-                  type="datetime-local"
-                  name="scheduled_at"
-                  value={formDataa.scheduled_at || getCurrentISTDateTime()}
-                  onChange={handleInputChange}
-                  onKeyDown={(e) => e.preventDefault()}
-                  onClick={handleScheduledAtClick}
-                  style={{ cursor: 'pointer' }}
-                  className="sche_input"
-              />
+            <label>Next Follow Up:</label>
+            <input
+              type="datetime-local"
+              name="scheduled_at"
+              value={formDataa.scheduled_at || getCurrentISTDateTime()}
+              onChange={handleInputChange}
+              onKeyDown={(e) => e.preventDefault()}
+              onClick={handleScheduledAtClick}
+              style={{ cursor: 'pointer' }}
+              className="sche_input"
+            />
           </div>
 
           {/* Reminder Notes Section */}
