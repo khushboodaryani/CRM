@@ -10,15 +10,9 @@ import { Dialog, DialogTitle, DialogContent, DialogActions, Button, IconButton, 
 import CloseIcon from '@mui/icons-material/Close';
 
 const UploadNew = () => {
-    const [systemHeaders] = useState([
-        "first_name", "last_name", "company_name", "phone_no", "email_id", "address",
-        "agent_name", 
-        "lead_source", "call_date_time", "call_status", "call_outcome",
-        "product", "budget", "decision_making", "decision_time", "lead_stage",
-        "next_follow_up", "assigned_agent", "reminder_notes", "priority_level",
-        "customer_category", "tags_labels", "communcation_channel", "deal_value",
-        "conversion_status", "customer_history", "comment", "call_recording",
-    ]);
+    const [systemHeaders, setSystemHeaders] = useState([]);
+    const [headerLabelsState, setHeaderLabelsState] = useState({});
+    const [enumValuesState, setEnumValuesState] = useState({});
     const [fileHeaders, setFileHeaders] = useState([]);
     const [headerMapping, setHeaderMapping] = useState({});
     const [selectedFileName, setSelectedFileName] = useState("");
@@ -32,37 +26,71 @@ const UploadNew = () => {
     const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
     const navigate = useNavigate();
 
-    // Header mapping from system headers to frontend labels
-    const headerLabels = {
-        'first_name': 'First Name *',
-        'last_name': 'Last Name',
-        'company_name': 'Company Name',
-        'phone_no': 'Phone *',
-        'email_id': 'Email',
-        'address': 'Address',
-        'agent_name': 'Agent Name *',
-        'lead_source': 'Lead Source',
-        'call_date_time': 'Call Date Time',
-        'call_status': 'Call Status',
-        'call_outcome': 'Call Outcome',
-        'product': 'Product',
-        'budget': 'Budget',
-        'decision_making': 'Decision Making',
-        'decision_time': 'Decision Time',
-        'lead_stage': 'Lead Stage',
-        'next_follow_up': 'Next Follow Up',
-        'assigned_agent': 'Assigned Agent',
-        'reminder_notes': 'Reminder Notes',
-        'priority_level': 'Priority Level',
-        'customer_category': 'Customer Category',
-        'tags_labels': 'Tags/Labels',
-        'communcation_channel': 'Communication Channel',
-        'deal_value': 'Deal Value',
-        'conversion_status': 'Conversion Status',
-        'customer_history': 'Customer History',
-        'comment': 'Comment',
-        'call_recording': 'Call Recording'
-    };
+    // Fetch custom fields from database on component mount
+    useEffect(() => {
+        const fetchCustomFields = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const apiUrl = process.env.REACT_APP_API_URL;
+
+                const response = await axios.get(`${apiUrl}/custom-fields`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+
+                if (response.data.success) {
+                    // Define system fields that should never be shown in upload
+                    const systemFieldsToHide = [
+                        'id', 'created_at', 'updated_at', 'last_updated',
+                        'company_id', 'team_id', 'duplicate_action', 'C_unique_id'
+                    ];
+
+                    // Filter out system fields
+                    const allFields = response.data.fields.filter(field =>
+                        !systemFieldsToHide.includes(field.COLUMN_NAME)
+                    );
+
+                    // Extract field names for systemHeaders
+                    const fieldNames = allFields.map(field => field.COLUMN_NAME);
+                    setSystemHeaders(fieldNames);
+
+                    // Build headerLabels dynamically
+                    const labels = {};
+                    const enums = {};
+
+                    allFields.forEach(field => {
+                        const fieldName = field.COLUMN_NAME;
+
+                        // Format label: first_name -> First Name
+                        const label = fieldName
+                            .split('_')
+                            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                            .join(' ');
+
+                        // Mark required fields
+                        const isRequired = field.IS_NULLABLE === 'NO';
+                        labels[fieldName] = isRequired ? `${label} *` : label;
+
+                        // Extract enum values if field is enum type
+                        if (field.DATA_TYPE === 'enum') {
+                            const options = field.COLUMN_TYPE.match(/'([^']+)'/g)?.map(s => s.replace(/'/g, '')) || [];
+                            enums[fieldName] = options;
+                        }
+                    });
+
+                    setHeaderLabelsState(labels);
+                    setEnumValuesState(enums);
+                }
+            } catch (err) {
+                console.error('Error fetching custom fields:', err);
+                setError('Failed to load form fields. Please refresh the page.');
+            }
+        };
+
+        fetchCustomFields();
+    }, []);
+
+    // Use dynamic values
+    const headerLabels = headerLabelsState;
 
     // Helper function to convert empty values to null
     const convertEmptyToNull = (data) => {
@@ -79,40 +107,27 @@ const UploadNew = () => {
             const cleanedRow = {};
             Object.keys(row).forEach(key => {
                 let value = row[key]?.toString().trim() || null;
-                
+
                 // Find the corresponding system header for this key
                 const systemHeader = Object.keys(headerMapping).find(sysHeader => headerMapping[sysHeader] === key);
-                
+
                 // Normalize enum values if this is an enum field
                 if (systemHeader && enumValues[systemHeader] && value) {
                     value = normalizeEnumValue(systemHeader, value);
                 }
-                
+
                 cleanedRow[key] = value;
             });
             return cleanedRow;
         });
     };
 
-    // Database enum values (case-insensitive validation)
-    const enumValues = {
-        'lead_source': ['website', 'data', 'referral', 'ads'],
-        'call_status': ['connected', 'not connected', 'follow_up'],
-        'call_outcome': ['interested', 'not interested', 'call_later', 'wrong_number'],
-        'decision_making': ['yes', 'no'],
-        'decision_time': ['immediate', '1_week', '1_month', 'future_investment'],
-        'lead_stage': ['new', 'in_progress', 'qualified', 'converted', 'lost'],
-        'priority_level': ['low', 'medium', 'high'],
-        'customer_category': ['hot', 'warm', 'cold'],
-        'tags_labels': ['premium_customer', 'repeat_customer', 'demo_required'],
-        'communcation_channel': ['call', 'whatsapp', 'email', 'sms'],
-        'conversion_status': ['lead', 'opportunity', 'customer'],
-        'customer_history': ['previous calls', 'purchases', 'interactions78']
-    };
+    // Use dynamic enum values
+    const enumValues = enumValuesState;
 
     // Add validation functions
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    
+
     const validatePhoneNumber = (phone) => {
         const phoneStr = String(phone);
         // If the phone number starts with '+', remove it for validation
@@ -128,42 +143,42 @@ const UploadNew = () => {
     // Function to validate enum values (case-insensitive with format variations)
     const validateEnumValue = (fieldName, value) => {
         if (!value || !enumValues[fieldName]) return true; // Allow null/empty values
-        
+
         const normalizedValue = String(value).toLowerCase().trim();
         const allowedValues = enumValues[fieldName].map(v => v.toLowerCase());
-        
+
         // Check direct match first
         if (allowedValues.includes(normalizedValue)) return true;
-        
+
         // Check with underscore/space variations
         const valueWithSpaces = normalizedValue.replace(/_/g, ' ');
         const valueWithUnderscores = normalizedValue.replace(/ /g, '_');
-        
-        return allowedValues.includes(valueWithSpaces) || 
-               allowedValues.some(allowed => allowed.replace(/ /g, '_') === valueWithUnderscores);
+
+        return allowedValues.includes(valueWithSpaces) ||
+            allowedValues.some(allowed => allowed.replace(/ /g, '_') === valueWithUnderscores);
     };
 
     // Function to normalize enum values to match database format
     const normalizeEnumValue = (fieldName, value) => {
         if (!value || !enumValues[fieldName]) return value;
-        
+
         const normalizedValue = String(value).toLowerCase().trim();
         const allowedValues = enumValues[fieldName];
-        
+
         // Try direct match first
         let matchedValue = allowedValues.find(v => v.toLowerCase() === normalizedValue);
-        
+
         // If no direct match, try with underscore/space variations
         if (!matchedValue) {
             const valueWithSpaces = normalizedValue.replace(/_/g, ' ');
             const valueWithUnderscores = normalizedValue.replace(/ /g, '_');
-            
-            matchedValue = allowedValues.find(v => 
-                v.toLowerCase() === valueWithSpaces || 
+
+            matchedValue = allowedValues.find(v =>
+                v.toLowerCase() === valueWithSpaces ||
                 v.toLowerCase().replace(/ /g, '_') === valueWithUnderscores
             );
         }
-        
+
         return matchedValue || value; // Return original if no match found
     };
 
@@ -213,13 +228,13 @@ const UploadNew = () => {
             const fileName = file.name.toLowerCase();
             const validExtensions = ['.xlsx', '.csv', '.xls'];
             const isValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
-            
+
             if (!isValidExtension) {
                 alert('Please upload only .xlsx, .xls or .csv files');
                 e.target.value = ''; // Clear the file input
                 return;
             }
-            
+
             setSelectedFileName(file.name);
             const fileType = file.type;
 
@@ -258,7 +273,7 @@ const UploadNew = () => {
             const workbook = XLSX.read(data, { type: "binary" });
             const sheetName = workbook.SheetNames[0];
             const worksheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
-            
+
             // Check if worksheet is empty or first row is null/undefined
             if (!worksheet || worksheet.length === 0 || !worksheet[0]) {
                 alert('Error: The uploaded file contains empty or invalid data. Please ensure the file has valid headers and data.');
@@ -299,7 +314,7 @@ const UploadNew = () => {
     // Function to get available options for the dropdown
     const getAvailableOptions = (systemHeader) => {
         const selectedHeaders = Object.values(headerMapping);
-        return fileHeaders.filter(header => 
+        return fileHeaders.filter(header =>
             header && // Ensure header is not null/undefined
             (!selectedHeaders.includes(header) || header === headerMapping[systemHeader])
         );
@@ -318,7 +333,7 @@ const UploadNew = () => {
             // Validate that all required fields are mapped
             const requiredFields = ["first_name", "phone_no", "agent_name"];
             const missingFields = requiredFields.filter(field => !headerMapping[field]);
-            
+
             if (missingFields.length > 0) {
                 setError(`Please map the following required fields: ${(missingFields || []).map(field => headerLabels[field] || field).join(", ")}`);
                 return;
@@ -329,14 +344,14 @@ const UploadNew = () => {
                 .map((row, index) => ({
                     row,
                     index: index + 1,
-                    missingFields: requiredFields.filter(field => 
+                    missingFields: requiredFields.filter(field =>
                         !row[headerMapping[field]]?.toString().trim()
                     )
                 }))
-                .filter(({missingFields}) => missingFields.length > 0);
+                .filter(({ missingFields }) => missingFields.length > 0);
 
             if (rowsWithMissingData.length > 0) {
-                const errorMessages = (rowsWithMissingData || []).map(({index, missingFields}) => 
+                const errorMessages = (rowsWithMissingData || []).map(({ index, missingFields }) =>
                     `Row ${index}: Missing ${(missingFields || []).map(field => headerLabels[field] || field).join(", ")}`
                 );
                 setError(`Required fields missing in some rows:\n${errorMessages.join("\n")}`);
@@ -390,7 +405,7 @@ const UploadNew = () => {
             };
             setUploadResult(uploadResultData);
             setUploadId(result.uploadId);
-            
+
             // If MIS role, auto-confirm upload and stay on upload page
             if (isMisRole) {
                 // Auto-confirm the upload for MIS role
@@ -426,18 +441,18 @@ const UploadNew = () => {
             const newPhone = dup.new_record[headerMapping['phone_no']] || 'N/A';
             const newEmail = dup.new_record[headerMapping['email_id']] || 'N/A';
             const newAgent = dup.agent_name || 'N/A';
-            
+
             const existingName = dup.existing_record.first_name || 'N/A';
             const existingPhone = dup.existing_record.phone_no || 'N/A';
             const existingEmail = dup.existing_record.email_id || 'N/A';
             const existingAgent = dup.existing_record.agent_name || 'N/A';
-            
+
             // Determine which fields are duplicates
             const isNameMatch = newName === existingName;
             const isPhoneMatch = newPhone === existingPhone;
             const isEmailMatch = newEmail === existingEmail;
             const isAgentMatch = newAgent === existingAgent;
-            
+
             return {
                 new: {
                     name: newName,
@@ -480,9 +495,9 @@ const UploadNew = () => {
             }
 
             // Check if we have upload ID either from state or passed data
-            const currentUploadId = (uploadResultData && uploadResultData.uploadId) || 
-                                  (uploadResult && uploadResult.uploadId);
-            
+            const currentUploadId = (uploadResultData && uploadResultData.uploadId) ||
+                (uploadResult && uploadResult.uploadId);
+
             if (!currentUploadId) {
                 setError('Upload ID not found. Please try again.');
                 setIsUploading(false);
@@ -527,18 +542,18 @@ const UploadNew = () => {
 
     // Memoize the dialog content
     const duplicateDialog = (() => (
-        <Dialog 
-            open={showDuplicateDialog} 
-            onClose={() => setShowDuplicateDialog(false)} 
-            maxWidth="lg" 
+        <Dialog
+            open={showDuplicateDialog}
+            onClose={() => setShowDuplicateDialog(false)}
+            maxWidth="lg"
             fullWidth
             TransitionProps={{
                 mountOnEnter: true,
                 unmountOnExit: true
             }}
         >
-            <DialogTitle sx={{ 
-                backgroundColor: '#364C63', 
+            <DialogTitle sx={{
+                backgroundColor: '#364C63',
                 color: 'white',
                 fontSize: '1.25rem',
                 fontWeight: 600,
@@ -557,9 +572,9 @@ const UploadNew = () => {
                 <IconButton
                     aria-label="close"
                     onClick={() => setShowDuplicateDialog(false)}
-                    sx={{ 
-                        position: 'absolute', 
-                        right: 8, 
+                    sx={{
+                        position: 'absolute',
+                        right: 8,
                         top: 8,
                         color: 'white'
                     }}
@@ -568,19 +583,19 @@ const UploadNew = () => {
                 </IconButton>
             </DialogTitle>
             <DialogContent sx={{ p: 3, mt: 1 }}>
-                {(duplicateRecords || []).filter(record => 
+                {(duplicateRecords || []).filter(record =>
                     record && typeof record === 'object' && record.new && record.existing
                 ).map((record, idx) => (
-                    <Box key={idx} sx={{ 
-                        mb: 8, 
+                    <Box key={idx} sx={{
+                        mb: 8,
                         borderBottom: idx < duplicateRecords.length - 1 ? '2px solid #eee' : 'none'
                     }}>
                         <TableContainer sx={{ mb: 1, padding: '0' }}>
                             <Table size="small">
                                 <TableHead>
                                     <TableRow>
-                                        <TableCell sx={{ 
-                                            width: '15%', 
+                                        <TableCell sx={{
+                                            width: '15%',
                                             backgroundColor: '#f5f5f5',
                                             fontWeight: 600,
                                             fontSize: '1rem',
@@ -589,7 +604,7 @@ const UploadNew = () => {
                                         }}>
                                             Field
                                         </TableCell>
-                                        <TableCell sx={{ 
+                                        <TableCell sx={{
                                             width: '42.5%',
                                             backgroundColor: '#e8f5e9',
                                             color: '#2e7d32',
@@ -599,7 +614,7 @@ const UploadNew = () => {
                                         }}>
                                             New Record
                                         </TableCell>
-                                        <TableCell sx={{ 
+                                        <TableCell sx={{
                                             width: '42.5%',
                                             backgroundColor: '#EF6F53',
                                             color: 'white',
@@ -615,8 +630,8 @@ const UploadNew = () => {
                                     <TableRow>
                                         <TableCell sx={{ backgroundColor: '#fafafa', padding: '8px' }}>Name</TableCell>
                                         <TableCell sx={{ backgroundColor: '#f1f8f1', padding: '8px' }}>{record?.new?.name || 'N/A'}</TableCell>
-                                        <TableCell sx={{ 
-                                            backgroundColor: record?.matches?.name ? '#ffecb3' : '#fff5f5', 
+                                        <TableCell sx={{
+                                            backgroundColor: record?.matches?.name ? '#ffecb3' : '#fff5f5',
                                             padding: '8px',
                                             fontWeight: record?.matches?.name ? 'bold' : 'normal'
                                         }}>
@@ -627,8 +642,8 @@ const UploadNew = () => {
                                     <TableRow>
                                         <TableCell sx={{ backgroundColor: '#fafafa', padding: '8px' }}>Phone</TableCell>
                                         <TableCell sx={{ backgroundColor: '#f1f8f1', padding: '8px' }}>{record?.new?.phone || 'N/A'}</TableCell>
-                                        <TableCell sx={{ 
-                                            backgroundColor: record?.matches?.phone ? '#ffecb3' : '#fff5f5', 
+                                        <TableCell sx={{
+                                            backgroundColor: record?.matches?.phone ? '#ffecb3' : '#fff5f5',
                                             padding: '8px',
                                             fontWeight: record?.matches?.phone ? 'bold' : 'normal'
                                         }}>
@@ -639,8 +654,8 @@ const UploadNew = () => {
                                     <TableRow>
                                         <TableCell sx={{ backgroundColor: '#fafafa', padding: '8px' }}>Email</TableCell>
                                         <TableCell sx={{ backgroundColor: '#f1f8f1', padding: '8px' }}>{record?.new?.email || 'N/A'}</TableCell>
-                                        <TableCell sx={{ 
-                                            backgroundColor: record?.matches?.email ? '#ffecb3' : '#fff5f5', 
+                                        <TableCell sx={{
+                                            backgroundColor: record?.matches?.email ? '#ffecb3' : '#fff5f5',
                                             padding: '8px',
                                             fontWeight: record?.matches?.email ? 'bold' : 'normal'
                                         }}>
@@ -651,8 +666,8 @@ const UploadNew = () => {
                                     <TableRow>
                                         <TableCell sx={{ backgroundColor: '#fafafa', padding: '8px' }}>Agent</TableCell>
                                         <TableCell sx={{ backgroundColor: '#f1f8f1', padding: '8px' }}>{record?.new?.agent || 'N/A'}</TableCell>
-                                        <TableCell sx={{ 
-                                            backgroundColor: record?.matches?.agent ? '#ffecb3' : '#fff5f5', 
+                                        <TableCell sx={{
+                                            backgroundColor: record?.matches?.agent ? '#ffecb3' : '#fff5f5',
                                             padding: '8px',
                                             fontWeight: record?.matches?.agent ? 'bold' : 'normal'
                                         }}>
@@ -663,7 +678,7 @@ const UploadNew = () => {
                                 </TableBody>
                             </Table>
                         </TableContainer>
-                        <Box sx={{ 
+                        <Box sx={{
                             backgroundColor: '#f8f9fa',
                             p: 1,
                             borderRadius: 1
@@ -677,8 +692,8 @@ const UploadNew = () => {
                                     value={record.action || 'skip'}
                                     onChange={(e) => {
                                         const value = e.target.value;
-                                        setDuplicateRecords(prev => 
-                                            prev.map((r, i) => 
+                                        setDuplicateRecords(prev =>
+                                            prev.map((r, i) =>
                                                 i === idx ? { ...r, action: value } : r
                                             )
                                         );
@@ -707,12 +722,12 @@ const UploadNew = () => {
                     </Box>
                 ))}
             </DialogContent>
-            <DialogActions sx={{ 
-                p: 3, 
+            <DialogActions sx={{
+                p: 3,
                 borderTop: '1px solid #eee',
                 backgroundColor: '#fafafa'
             }}>
-                <Button 
+                <Button
                     onClick={() => setShowDuplicateDialog(false)}
                     disabled={isUploading}
                     sx={{ mr: 1 }}
@@ -724,7 +739,7 @@ const UploadNew = () => {
                     variant="contained"
                     color="primary"
                     disabled={isUploading}
-                    sx={{ 
+                    sx={{
                         backgroundColor: '#364C63',
                         '&:hover': {
                             backgroundColor: '#2b3d4f'
@@ -753,7 +768,7 @@ const UploadNew = () => {
         <div className="file-upload-page">
             <div className="upload-header">
                 <h2 className="upload_new_headiiii">Upload File </h2>
-                <button 
+                <button
                     className="download-sample-btn"
                     onClick={downloadSampleData}
                 >
@@ -767,7 +782,7 @@ const UploadNew = () => {
                     accept=".csv,.xlsx,.xls"
                     className="file-input"
                 />
-                
+
             </div>
             <div className="containerr">
                 <div className="upload-form">
@@ -799,9 +814,9 @@ const UploadNew = () => {
                                 ))}
                             </div>
                             <div className="submit-container">
-                                <button 
-                                    onClick={handleUpload} 
-                                    className="submitt-btnn" 
+                                <button
+                                    onClick={handleUpload}
+                                    className="submitt-btnn"
                                     disabled={!selectedFileName || fileHeaders.length === 0}
                                 >
                                     Submit
@@ -813,23 +828,23 @@ const UploadNew = () => {
                 </div>
 
                 {uploadResult && (
-                <div className="upload-result">
-                    {/* <h3 className="upload_res_headii">Upload Summary</h3>
+                    <div className="upload-result">
+                        {/* <h3 className="upload_res_headii">Upload Summary</h3>
                     <p className="upload_res_para">Total Records: {uploadResult.totalRecords || 0}</p>
                     <p className="upload_res_para">Duplicate Entries: {uploadResult.duplicateCount || 0}</p>
                     <p className="upload_res_para">Unique Records: {uploadResult.uniqueRecords || 0}</p> */}
 
-                    {uploadResult.duplicates && uploadResult.duplicates.length > 0 && (
-                        renderDuplicateDialog()
-                    )}
-                </div>
+                        {uploadResult.duplicates && uploadResult.duplicates.length > 0 && (
+                            renderDuplicateDialog()
+                        )}
+                    </div>
                 )}
 
-            {error && (
-                <div className="error-messagee">
-                    {error}
-                </div>
-            )}
+                {error && (
+                    <div className="error-messagee">
+                        {error}
+                    </div>
+                )}
             </div>
         </div>
     );

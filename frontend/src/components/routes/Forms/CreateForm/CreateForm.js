@@ -179,14 +179,17 @@ const CreateForm = () => {
     });
   };
 
-  // Validate required fields
+  // Validate required fields dynamically
   const validateRequiredFields = () => {
-    const requiredFields = [
-      "first_name", "phone_no", "email_id"
+    // Get required fields from customFields state
+    const mandatoryFields = ['first_name', 'phone_no', 'agent_name'];
+    const allRequiredFields = [
+      ...mandatoryFields,
+      ...customFields.filter(f => f.IS_NULLABLE === 'NO').map(f => f.COLUMN_NAME)
     ];
 
-    for (let field of requiredFields) {
-      if (!formDataa[field] || formDataa[field].trim() === "") {
+    for (let field of allRequiredFields) {
+      if (!formDataa[field] || (typeof formDataa[field] === 'string' && formDataa[field].trim() === "")) {
         setError(`Please fill out the "${field.replace(/_/g, ' ').toUpperCase()}" field.`);
         return false;
       }
@@ -427,63 +430,49 @@ const CreateForm = () => {
         )}
 
         <form onSubmit={(e) => handleSubmit(e, 'prompt')} className="create-form">
-          {/* Standard Fields Map */}
-          {[
-            {
-              label: "First Name", name: "first_name", required: true
-            },
-            {
-              label: "Last Name", name: "last_name"
-            },
-            {
-              label: "Company Name", name: "company_name"
-            },
-            {
-              label: "Phone", name: "phone_no", required: true,
-              type: "tel", maxLength: "20"
-            },
-            {
-              label: "Email", name: "email_id",
-              type: "email"
-            },
-            {
-              label: "Address", name: "address"
-            },
-            {
-              label: "Call Recording", name: "call_recording"
-            },
-            {
-              label: "Product", name: "product"
-            },
-            {
-              label: "Budget", name: "budget"
-            },
-            {
-              label: "Assigned Agent", name: "assigned_agent"
-            },
-            {
-              label: "Deal Value", name: "deal_value"
-            },
-          ].map(({ label, name, type = "text", maxLength, required }) => (
-            <div key={name} className="label-input">
-              <label>{label}{required && <span className="required"> *</span>}:</label>
-              <input
-                type={type}
-                name={name}
-                value={formDataa[name] || ''}
-                onChange={handleInputChange}
-                maxLength={maxLength}
-              />
-            </div>
-          ))}
+          {/* Mandatory Fields - Always shown first */}
+          <div className="label-input">
+            <label>First Name<span className="required"> *</span>:</label>
+            <input
+              type="text"
+              name="first_name"
+              value={formDataa.first_name || ''}
+              onChange={handleInputChange}
+              required
+            />
+          </div>
 
-          {/* Dynamic Custom Fields */}
+          <div className="label-input">
+            <label>Phone<span className="required"> *</span>:</label>
+            <input
+              type="text"
+              name="phone_no"
+              value={formDataa.phone_no || ''}
+              onChange={handleInputChange}
+              maxLength={15}
+              required
+            />
+          </div>
+
+          <div className="label-input">
+            <label>Agent Name<span className="required"> *</span>:</label>
+            <input
+              type="text"
+              name="agent_name"
+              value={formDataa.agent_name || ''}
+              onChange={handleInputChange}
+              readOnly
+              style={{ backgroundColor: '#f5f5f5' }}
+            />
+          </div>
+
+          {/* Dynamic Custom Fields - Fetched from database */}
           {customFields.map(field => {
             const isRequired = field.IS_NULLABLE === 'NO';
             const label = field.COLUMN_NAME.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
+            // Handle ENUM fields
             if (field.DATA_TYPE === 'enum') {
-              // Parse enum values from string "enum('val1','val2')"
               const options = field.COLUMN_TYPE.match(/'([^']+)'/g)?.map(s => s.replace(/'/g, '')) || [];
 
               return (
@@ -497,18 +486,62 @@ const CreateForm = () => {
                   >
                     <option value="">Select {label}</option>
                     {options.map(opt => (
-                      <option key={opt} value={opt}>{opt}</option>
+                      <option key={opt} value={opt}>{opt.replace(/_/g, ' ')}</option>
                     ))}
                   </select>
                 </div>
               );
             }
 
-            let inputType = 'text';
-            if (['int', 'decimal', 'float', 'double'].includes(field.DATA_TYPE)) inputType = 'number';
-            else if (['date'].includes(field.DATA_TYPE)) inputType = 'date';
-            else if (['datetime', 'timestamp'].includes(field.DATA_TYPE)) inputType = 'datetime-local';
+            // Handle TEXT/LONGTEXT fields
+            if (['text', 'longtext', 'mediumtext'].includes(field.DATA_TYPE.toLowerCase())) {
+              return (
+                <div key={field.COLUMN_NAME} className="label-input comment">
+                  <label>{label}{isRequired && <span className="required"> *</span>}:</label>
+                  <div className="textarea-container">
+                    <textarea
+                      name={field.COLUMN_NAME}
+                      value={formDataa[field.COLUMN_NAME] || ''}
+                      onChange={handleInputChange}
+                      required={isRequired}
+                      rows={4}
+                    />
+                  </div>
+                </div>
+              );
+            }
 
+            // Determine input type based on DATA_TYPE
+            let inputType = 'text';
+            if (['int', 'decimal', 'float', 'double', 'bigint'].includes(field.DATA_TYPE.toLowerCase())) {
+              inputType = 'number';
+            } else if (field.DATA_TYPE.toLowerCase() === 'date') {
+              inputType = 'date';
+            } else if (['datetime', 'timestamp'].includes(field.DATA_TYPE.toLowerCase())) {
+              inputType = 'datetime-local';
+            }
+
+            // Special handling for scheduled_at field
+            if (field.COLUMN_NAME === 'scheduled_at') {
+              return (
+                <div key={field.COLUMN_NAME} className="label-input">
+                  <label>{label}{isRequired && <span className="required"> *</span>}:</label>
+                  <input
+                    type="datetime-local"
+                    name={field.COLUMN_NAME}
+                    value={formDataa[field.COLUMN_NAME] || getCurrentISTDateTime()}
+                    onChange={handleInputChange}
+                    onKeyDown={(e) => e.preventDefault()}
+                    onClick={handleScheduledAtClick}
+                    style={{ cursor: 'pointer' }}
+                    className="sche_input"
+                    required={isRequired}
+                  />
+                </div>
+              );
+            }
+
+            // Default input rendering
             return (
               <div key={field.COLUMN_NAME} className="label-input">
                 <label>{label}{isRequired && <span className="required"> *</span>}:</label>
@@ -523,193 +556,12 @@ const CreateForm = () => {
             );
           })}
 
-          {/* Lead Source Dropdown */}
-          <div className="label-input">
-            <label>Lead Source:</label>
-            <select name="lead_source" value={formDataa.lead_source} onChange={handleInputChange}>
-              <option value="website">Website</option>
-              <option value="data">Data</option>
-              <option value="referral">Referral</option>
-              <option value="ads">Ads</option>
-            </select>
-          </div>
-
-          {/* Call Date Time */}
-          <div className="label-input">
-            <label>Call Date Time:</label>
-            <input
-              type="datetime-local"
-              name="call_date_time"
-              value={formDataa.call_date_time || ''}
-              onChange={handleInputChange}
-            />
-          </div>
-
-          {/* Call Status Dropdown */}
-          <div className="label-input">
-            <label>Call Status:</label>
-            <select name="call_status" value={formDataa.call_status} onChange={handleInputChange}>
-              <option value="connected">Connected</option>
-              <option value="not connected">Not Connected</option>
-              <option value="follow_up">Follow Up</option>
-            </select>
-          </div>
-
-          {/* Call Outcome Dropdown */}
-          <div className="label-input">
-            <label>Call Outcome:</label>
-            <select name="call_outcome" value={formDataa.call_outcome} onChange={handleInputChange}>
-              <option value="interested">Interested</option>
-              <option value="not interested">Not Interested</option>
-              <option value="call_later">Call Later</option>
-              <option value="wrong_number">Wrong Number</option>
-            </select>
-          </div>
-
-          {/* Decision Making Dropdown */}
-          <div className="label-input">
-            <label>Decision Making:</label>
-            <select name="decision_making" value={formDataa.decision_making} onChange={handleInputChange}>
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
-            </select>
-          </div>
-
-          {/* Decision Time Dropdown */}
-          <div className="label-input">
-            <label>Decision Time:</label>
-            <select name="decision_time" value={formDataa.decision_time} onChange={handleInputChange}>
-              <option value="imeediate">Immediate</option>
-              <option value="1_week">1 Week</option>
-              <option value="1_month">1 Month</option>
-              <option value="future_investment">Future Investment</option>
-            </select>
-          </div>
-
-          {/* Lead Stage Dropdown */}
-          <div className="label-input">
-            <label>Lead Stage:</label>
-            <select name="lead_stage" value={formDataa.lead_stage} onChange={handleInputChange}>
-              <option value="new">New</option>
-              <option value="in_progress">In Progress</option>
-              <option value="qualified">Qualified</option>
-              <option value="converted">Converted</option>
-              <option value="lost">Lost</option>
-            </select>
-          </div>
-
-          {/* Priority Level Dropdown */}
-          <div className="label-input">
-            <label>Priority Level:</label>
-            <select name="priority_level" value={formDataa.priority_level} onChange={handleInputChange}>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
-          </div>
-
-          {/* Customer Category Dropdown */}
-          <div className="label-input">
-            <label>Customer Category:</label>
-            <select name="customer_category" value={formDataa.customer_category} onChange={handleInputChange}>
-              <option value="hot">Hot</option>
-              <option value="warm">Warm</option>
-              <option value="cold">Cold</option>
-            </select>
-          </div>
-
-          {/* Tags/Labels Dropdown */}
-          <div className="label-input">
-            <label>Tags/Labels:</label>
-            <select name="tags_labels" value={formDataa.tags_labels} onChange={handleInputChange}>
-              <option value="premium_customer">Premium Customer</option>
-              <option value="repeat_customer">Repeat Customer</option>
-              <option value="demo_required">Demo Required</option>
-            </select>
-          </div>
-
-          {/* Communication Channel Dropdown */}
-          <div className="label-input">
-            <label>Communication Channel:</label>
-            <select name="communcation_channel" value={formDataa.communcation_channel} onChange={handleInputChange}>
-              <option value="call">Call</option>
-              <option value="whatsapp">WhatsApp</option>
-              <option value="email">Email</option>
-              <option value="sms">SMS</option>
-            </select>
-          </div>
-
-          {/* Conversion Status Dropdown */}
-          <div className="label-input">
-            <label>Conversion Status:</label>
-            <select name="conversion_status" value={formDataa.conversion_status} onChange={handleInputChange}>
-              <option value="lead">Lead</option>
-              <option value="opportunity">Opportunity</option>
-              <option value="customer">Customer</option>
-            </select>
-          </div>
-
-          {/* Customer History Dropdown */}
-          <div className="label-input">
-            <label>Customer History:</label>
-            <select name="customer_history" value={formDataa.customer_history} onChange={handleInputChange}>
-              <option value="previous calls">Previous Calls</option>
-              <option value="purchases">Purchases</option>
-              <option value="interactions78">Interactions</option>
-            </select>
-          </div>
-
-          {/* Schedule Call  */}
-          <div className="label-input">
-            <label>Next Follow Up:</label>
-            <input
-              type="datetime-local"
-              name="scheduled_at"
-              value={formDataa.scheduled_at || getCurrentISTDateTime()}
-              onChange={handleInputChange}
-              onKeyDown={(e) => e.preventDefault()}
-              onClick={handleScheduledAtClick}
-              style={{ cursor: 'pointer' }}
-              className="sche_input"
-            />
-          </div>
-
-          {/* Reminder Notes Section */}
-          <div className="label-input comment">
-            <label>Reminder Notes:</label>
-            <div className="textarea-container">
-              <textarea
-                name="reminder_notes"
-                value={formDataa.reminder_notes || ''}
-                onChange={handleInputChange}
-                rows="4"
-                placeholder="Enter reminder notes"
-                className="comet"
-              />
-            </div>
-          </div>
-
-          {/* Comment Section
-          <div className="label-input comment">
-              <label>Comment:</label>
-              <div className="textarea-container">
-                  <textarea
-                      name="comment"
-                      value={formDataa.comment || ''}
-                      onChange={handleInputChange}
-                      rows="6"
-                      placeholder="Enter any additional comment"
-                      className="comet"
-                  />
-              </div>
-          </div> */}
-
           <button type="submit" className="submit-btn submmit-button">
             Add Customer
           </button>
         </form>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 };
 

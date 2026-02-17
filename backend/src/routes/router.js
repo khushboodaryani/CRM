@@ -40,7 +40,7 @@ import restrictUsers from '../middlewares/restrictUsers.js';
 
 import { validateSession } from '../middlewares/sessionMiddleware.js';
 
-import { createUser, getAllUsers, getTeamMembers } from '../controllers/users.js';
+import { createUser, getAllUsers, getTeamMembers, updateUser, deleteUser } from '../controllers/users.js';
 
 // Multi-tenant imports
 import {
@@ -166,6 +166,8 @@ router.post('/records_schedule', getScheduleRecords);
 router.post('/users/create', authenticateToken, createUser);
 router.get('/users/all', authenticateToken, getAllUsers);
 router.get('/users/team/:teamId', authenticateToken, getTeamMembers);
+router.put('/users/:userId', authenticateToken, updateUser);
+router.delete('/users/:userId', authenticateToken, deleteUser);
 
 // Dynamic fields routes (Business Head only)
 

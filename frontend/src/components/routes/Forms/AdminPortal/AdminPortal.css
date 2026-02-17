@@ -352,12 +352,20 @@
 /* Portal Header Styles */
 .portal-header {
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
     margin-bottom: 20px;
+    position: relative;
+}
+
+.portal-header .admin-portal-heading {
+    flex: 1;
+    text-align: center;
 }
 
 .add-form-btn {
+    position: absolute;
+    right: 0;
     background-color: #10b981;
     color: white;
     border: none;
@@ -517,6 +525,72 @@
 }
 
 .cancel-button:hover {
+    background-color: #5a6268;
+}
+
+/* User Actions - Edit/Delete Buttons */
+.user-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    align-items: center;
+}
+
+.edit-btn,
+.delete-btn {
+    background: none;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 6px 10px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.edit-btn svg {
+    stroke: #2196f3;
+}
+
+.delete-btn svg {
+    stroke: #ef4444;
+}
+
+.edit-btn:hover {
+    background-color: #e3f2fd;
+    border-color: #2196f3;
+    transform: scale(1.1);
+}
+
+.edit-btn:hover svg {
+    stroke: #1976d2;
+}
+
+.delete-btn:hover {
+    background-color: #ffebee;
+    border-color: #ef4444;
+    transform: scale(1.1);
+}
+
+.delete-btn:hover svg {
+    stroke: #dc2626;
+}
+
+/* Form Buttons Container */
+.form-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 10px;
+}
+
+.form-buttons .cancel-button {
+    background-color: #6c757d;
+}
+
+.form-buttons .cancel-button:hover {
     background-color: #5a6268;
 }
 

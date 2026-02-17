@@ -307,3 +307,267 @@ export const getTeamMembers = async (req, res) => {
         }
     }
 };
+
+// Update user
+export const updateUser = async (req, res) => {
+    console.log('=== UPDATE USER REQUEST ===');
+    console.log('User ID:', req.params.userId);
+    console.log('Request body:', req.body);
+    console.log('Authenticated user:', req.user);
+
+    const { userId } = req.params;
+    const {
+        username,
+        email,
+        team_id,
+        role_type,
+        permissions
+    } = req.body;
+
+    // Only Business Head or Super Admin can update users
+    if (!['super_admin', 'business_head'].includes(req.user.role)) {
+        console.log('Access denied - user role:', req.user.role);
+        return res.status(403).json({
+            error: 'Only Business Head or Super Admin can update users'
+        });
+    }
+
+    // Validate required fields
+    if (!username || !email || !role_type) {
+        return res.status(400).json({
+            error: 'Missing required fields: username, email, and role_type are required'
+        });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    // Validate role type
+    if (!['user', 'team_leader', 'business_head', 'mis'].includes(role_type)) {
+        return res.status(400).json({ error: 'Invalid role type' });
+    }
+
+    try {
+        console.log('Connecting to database...');
+        const pool = connectDB();
+        const conn = await pool.getConnection();
+        console.log('Database connection established');
+
+        try {
+            await conn.beginTransaction();
+            console.log('Transaction started');
+
+            // Check if user exists and belongs to the same company
+            console.log('Checking if user exists:', userId);
+            const [existingUser] = await conn.query(
+                'SELECT * FROM users WHERE id = ?',
+                [userId]
+            );
+            console.log('Existing user found:', existingUser.length > 0);
+
+            if (existingUser.length === 0) {
+                console.log('User not found, rolling back');
+                await conn.rollback();
+                return res.status(404).json({ error: 'User not found' });
+            }
+
+            // Business Head can only edit users in their company
+            if (req.user.role === 'business_head' && existingUser[0].company_id !== req.user.company_id) {
+                await conn.rollback();
+                return res.status(403).json({ error: 'You can only edit users in your company' });
+            }
+
+            // Check if email is already used by another user
+            const [emailCheck] = await conn.query(
+                'SELECT * FROM users WHERE email = ? AND id != ?',
+                [email, userId]
+            );
+
+            if (emailCheck.length > 0) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'Email already exists' });
+            }
+
+            // Check if username exists within the company (excluding current user)
+            const [usernameCheck] = await conn.query(
+                'SELECT * FROM users WHERE username = ? AND company_id = ? AND id != ?',
+                [username, existingUser[0].company_id, userId]
+            );
+
+            if (usernameCheck.length > 0) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'Username already exists in your company' });
+            }
+
+            // Get role id
+            const [roleResult] = await conn.query(
+                'SELECT id FROM roles WHERE role_name = ?',
+                [role_type]
+            );
+
+            if (roleResult.length === 0) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'Invalid role type' });
+            }
+
+            // Update user
+            await conn.query(
+                'UPDATE users SET username = ?, email = ?, team_id = ?, role_id = ? WHERE id = ?',
+                [username, email, ['business_head', 'mis'].includes(role_type) ? null : team_id, roleResult[0].id, userId]
+            );
+
+            // Update permissions if provided
+            if (permissions) {
+                // Delete existing permissions
+                await conn.query('DELETE FROM user_permissions WHERE user_id = ?', [userId]);
+
+                // Get all permission IDs
+                const [permissionRows] = await conn.query('SELECT id, permission_name FROM permissions');
+
+                // Insert new permissions
+                for (const [permName, value] of Object.entries(permissions)) {
+                    const permission = permissionRows.find(p => p.permission_name === permName);
+                    if (permission) {
+                        await conn.query(
+                            'INSERT INTO user_permissions (user_id, permission_id, value) VALUES (?, ?, ?)',
+                            [userId, permission.id, value ? 1 : 0]
+                        );
+                    }
+                }
+            }
+
+            await conn.commit();
+
+            res.json({
+                message: 'User updated successfully',
+                user_id: userId
+            });
+
+        } catch (error) {
+            console.error('Transaction error:', error);
+            await conn.rollback();
+            throw error;
+        } finally {
+            conn.release();
+            console.log('Database connection released');
+        }
+
+    } catch (error) {
+        console.error('Error updating user:', error);
+        console.error('Error stack:', error.stack);
+        res.status(500).json({
+            error: 'Internal server error',
+            details: error.message
+        });
+    }
+};
+
+// Delete user
+export const deleteUser = async (req, res) => {
+    console.log('=== DELETE USER REQUEST ===');
+    console.log('User ID to delete:', req.params.userId);
+    console.log('Authenticated user:', req.user);
+
+    const { userId } = req.params;
+
+    // Only Business Head or Super Admin can delete users
+    if (!['super_admin', 'business_head'].includes(req.user.role)) {
+        console.log('Access denied - user role:', req.user.role);
+        return res.status(403).json({
+            error: 'Only Business Head or Super Admin can delete users'
+        });
+    }
+
+    try {
+        console.log('Connecting to database...');
+        const pool = connectDB();
+        const conn = await pool.getConnection();
+        console.log('Database connection established');
+
+        try {
+            await conn.beginTransaction();
+            console.log('Transaction started');
+
+            // Check if user exists and belongs to the same company
+            console.log('Checking if user exists:', userId);
+            const [existingUser] = await conn.query(
+                'SELECT * FROM users WHERE id = ?',
+                [userId]
+            );
+            console.log('Existing user:', existingUser.length > 0 ? 'Found' : 'Not found');
+
+            if (existingUser.length === 0) {
+                console.log('User not found, rolling back');
+                await conn.rollback();
+                return res.status(404).json({ error: 'User not found' });
+            }
+
+            // Business Head can only delete users in their company
+            if (req.user.role === 'business_head' && existingUser[0].company_id !== req.user.company_id) {
+                await conn.rollback();
+                return res.status(403).json({ error: 'You can only delete users in your company' });
+            }
+
+            // Prevent deleting super_admin
+            const [userRole] = await conn.query(
+                'SELECT r.role_name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?',
+                [userId]
+            );
+
+            if (userRole.length > 0 && userRole[0].role_name === 'super_admin') {
+                await conn.rollback();
+                return res.status(403).json({ error: 'Cannot delete super admin' });
+            }
+
+            // Delete user permissions first (foreign key constraint)
+            console.log('Deleting user permissions...');
+            await conn.query('DELETE FROM user_permissions WHERE user_id = ?', [userId]);
+            console.log('User permissions deleted');
+
+            // Delete user sessions (check if table exists first)
+            console.log('Deleting user sessions...');
+            try {
+                await conn.query('DELETE FROM user_sessions WHERE user_id = ?', [userId]);
+                console.log('User sessions deleted');
+            } catch (sessionError) {
+                console.log('Note: user_sessions table may not exist or error:', sessionError.message);
+                // Continue anyway - this is not critical
+            }
+
+            // Delete user
+            console.log('Deleting user record...');
+            await conn.query('DELETE FROM users WHERE id = ?', [userId]);
+            console.log('User deleted successfully');
+
+            // License count will be automatically updated by trigger
+
+            await conn.commit();
+            console.log('Transaction committed');
+
+            res.json({
+                message: 'User deleted successfully',
+                user_id: userId
+            });
+
+        } catch (error) {
+            console.error('Transaction error:', error);
+            await conn.rollback();
+            console.log('Transaction rolled back');
+            throw error;
+        } finally {
+            conn.release();
+            console.log('Database connection released');
+        }
+
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        console.error('Error stack:', error.stack);
+        res.status(500).json({
+            error: 'Internal server error',
+            details: error.message
+        });
+    }
+};

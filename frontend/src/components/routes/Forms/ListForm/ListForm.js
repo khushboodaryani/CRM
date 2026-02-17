@@ -25,7 +25,7 @@ const ListForm = () => {
     const fetchUserAndData = async () => {
       try {
         const token = localStorage.getItem('token');
-        
+
         // Fetch current user data
         const userResponse = await axios.get(`${apiUrl}/current-user`, {
           headers: {
@@ -33,7 +33,7 @@ const ListForm = () => {
             'Content-Type': 'application/json'
           }
         });
-        
+
         const userData = userResponse.data;
         setUser(userData);
         console.log('User data:', userData);
@@ -52,10 +52,10 @@ const ListForm = () => {
         console.log('Is admin role?', isAdmin);
 
         // Determine if user can assign teams (based on role only)
-        const hasTeamAssignRole = userData && 
+        const hasTeamAssignRole = userData &&
           ['super_admin', 'it_admin', 'business_head', 'team_leader'].includes(userData.role);
         setCanAssignTeam(hasTeamAssignRole);
-        
+
         // Determine if user can delete (based on role and permission)
         setCanDeleteCustomers(hasTeamAssignRole && userPermissions.includes('delete_customer'));
 
@@ -115,7 +115,7 @@ const ListForm = () => {
                 'Content-Type': 'application/json'
               }
             });
-            
+
             // Process agents response
             let agents = [];
             if (agentsResponse.data && Array.isArray(agentsResponse.data.data)) {
@@ -126,7 +126,7 @@ const ListForm = () => {
 
             // Filter out admin users from the list if the current user is a team leader
             if (userData.role === 'team_leader') {
-              agents = agents.filter(agent => 
+              agents = agents.filter(agent =>
                 agent.role === 'user' && agent.team_id === userData.team_id
               );
             }
@@ -210,7 +210,7 @@ const ListForm = () => {
 
   const handleSelectCustomer = (customer) => {
     if (!canAssignTeam) return;
-    
+
     setSelectedCustomers(prev => {
       const isSelected = prev.find(c => c.id === customer.id);
       if (isSelected) {
@@ -289,20 +289,20 @@ const ListForm = () => {
 
   // Function to view/edit customer details
   const handleViewCustomer = (customer) => {
-      navigate('/customers/phone/' + customer.phone_no, { 
-          state: { 
-              customer,
-              permissions // Pass permissions to UseForm
-          } 
-      });
+    navigate('/customers/phone/' + customer.phone_no, {
+      state: {
+        customer,
+        permissions // Pass permissions to UseForm
+      }
+    });
   };
-  
+
   const handleAddRecord = () => {
     if (!permissions.create_customer) {
       setError('You do not have permission to create new customers');
       return;
     }
-    navigate("/customer/new"); 
+    navigate("/customer/new");
   };
 
   // Add handleDeleteSelected function
@@ -311,7 +311,7 @@ const ListForm = () => {
       alert("You do not have permission to delete customers.");
       return;
     }
-    
+
     if (selectedCustomers.length === 0) {
       alert("Please select customers to delete.");
       return;
@@ -319,12 +319,12 @@ const ListForm = () => {
 
     const confirmDelete = window.confirm(`Are you sure you want to delete ${selectedCustomers.length} selected customers?`);
     if (!confirmDelete) return;
-    
+
     try {
       const token = localStorage.getItem('token');
       const customerIds = selectedCustomers.map(c => c.id);
-      
-      const response = await axios.post(`${apiUrl}/customers/delete-multiple`, 
+
+      const response = await axios.post(`${apiUrl}/customers/delete-multiple`,
         { customerIds },
         {
           headers: {
@@ -337,7 +337,7 @@ const ListForm = () => {
       // Remove deleted customers from state
       setCustomers(prev => prev.filter(c => !customerIds.includes(c.id)));
       setSelectedCustomers([]);
-      
+
       // Show success alert
       alert(`Successfully deleted ${customerIds.length} records!`);
     } catch (error) {
@@ -374,22 +374,17 @@ const ListForm = () => {
                         <th>S.no.</th>
                         <th>Name</th>
                         <th>Phone</th>
-                        <th>Email</th>
-                        <th>Lead Source</th>
-                        <th>Product</th>
-                        <th>Priority Level</th>
-                        <th>Conversion Status</th>
                       </tr>
                     </thead>
                     <tbody className="customer-body">
                       {currentCustomers.map((customer, index) => (
-                        <tr 
-                          key={customer.id} 
+                        <tr
+                          key={customer.id}
                           onClick={(e) => {
                             if (e.target.type !== 'checkbox') {
                               handleViewCustomer(customer);
                             }
-                          }} 
+                          }}
                           className="clickable-row"
                           title="Click to view details"
                         >
@@ -405,11 +400,6 @@ const ListForm = () => {
                           <td>{(currentPage - 1) * customersPerPage + index + 1}</td>
                           <td className="customer-name">{customer.first_name} {customer.last_name}</td>
                           <td><a href={`tel:${customer.phone_no}`}>{customer.phone_no}</a></td>
-                          <td>{customer.email_id}</td>
-                          <td>{customer.lead_source}</td>
-                          <td>{customer.product}</td>
-                          <td>{customer.priority_level}</td>
-                          <td>{customer.conversion_status}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -425,7 +415,7 @@ const ListForm = () => {
               <div className="team-assignment-controls">
                 {/* Only show delete button if user has delete permission */}
                 {canDeleteCustomers && (
-                  <button 
+                  <button
                     onClick={handleDeleteSelected}
                     className="delete-selected-btn"
                     disabled={selectedCustomers.length === 0}
@@ -433,10 +423,9 @@ const ListForm = () => {
                     Delete Selected
                   </button>
                 )}
-                
+
                 {/* Team assignment controls always visible if canAssignTeam */}
-                {/*
-                <select 
+                <select
                   value={selectedTeamUser}
                   onChange={(e) => setSelectedTeamUser(e.target.value)}
                   className="team-user-select"
@@ -448,26 +437,25 @@ const ListForm = () => {
                     </option>
                   ))}
                 </select>
-                <button 
+                <button
                   onClick={handleAssignTeam}
                   className="assign-team-btn"
                   disabled={!selectedTeamUser || selectedCustomers.length === 0}
                 >
                   Assign to Selected User
                 </button>
-                */}
               </div>
             )}
 
             {/* Pagination Controls */}
             <div className="pagination-container">
               {permissions.create_customer && (
-                <button 
-                  onClick={handleAddRecord} 
+                <button
+                  onClick={handleAddRecord}
                   className="add-record-btn"
                   aria-label="Add new customer"
                 >
-                  Add Record 
+                  Add Record
                 </button>
               )}
               {renderPagination()}

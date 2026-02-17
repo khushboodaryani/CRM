@@ -1,6 +1,7 @@
 // src/controllers/uploadFile.js
 
 import connectDB from '../db/index.js';
+import { getEnumValues } from '../utils/enumHelper.js';
 import { v4 as uuid } from 'uuid';
 
 // Use a Map to store upload data temporarily
@@ -23,21 +24,9 @@ const validateEnumValue = (value, enumValues) => {
     return null;
 };
 
-// Define enum values for validation
-const enumDefinitions = {
-    'lead_source': ['website', 'data', 'referral', 'ads'],
-    'call_status': ['connected', 'not connected', 'follow_up'],
-    'call_outcome': ['interested', 'not interested', 'call_later', 'wrong_number'],
-    'decision_making': ['yes', 'no'],
-    'decision_time': ['immediate', '1_week', '1_month', 'future_investment'],
-    'lead_stage': ['new', 'in_progress', 'qualified', 'converted', 'lost'],
-    'priority_level': ['low', 'medium', 'high'],
-    'customer_category': ['hot', 'warm', 'cold'],
-    'tags_labels': ['premium_customer', 'repeat_customer', 'demo_required'],
-    'communcation_channel': ['call', 'whatsapp', 'email', 'sms'],
-    'conversion_status': ['lead', 'opportunity', 'customer'],
-    'customer_history': ['previous calls', 'purchases', 'interactions78']
-};
+
+// Enum definitions will be fetched dynamically from database
+
 
 // Helper function to format date
 const formatDate = (dateStr) => {
@@ -138,6 +127,9 @@ export const uploadCustomerData = async (req, res) => {
         try {
             await connection.beginTransaction();
 
+            // Fetch enum definitions dynamically from database
+            const enumDefinitions = await getEnumValues(connection, 'customers');
+
             // Get valid agent usernames from users table
             const [userResults] = await connection.query(
                 'SELECT username, team_id FROM users'
@@ -190,7 +182,6 @@ export const uploadCustomerData = async (req, res) => {
             // Process each record
             for (const record of customerData) {
                 const phone = record[headerMapping['phone_no']];
-                const email = record[headerMapping['email_id']];
                 const firstName = record[headerMapping['first_name']];
                 const agentName = record[headerMapping['agent_name']];
 
@@ -199,21 +190,50 @@ export const uploadCustomerData = async (req, res) => {
                     continue;
                 }
 
-                // Build duplicate check query with company isolation
-                const duplicateQuery = `
+                // Build dynamic duplicate check query
+                // Only check phone_no and first_name (guaranteed to exist)
+                // email_id is optional and may not exist in minimal schema
+                let duplicateQuery = `
                     SELECT * FROM customers 
                     WHERE company_id = ?
-                    AND (phone_no = ? OR (? IS NOT NULL AND email_id = ?))
+                    AND phone_no = ?
                     AND first_name = ?
                 `;
 
-                const queryParams = [
-                    req.user.company_id, // Add company_id filter
+                let queryParams = [
+                    req.user.company_id,
                     phone,
-                    email,
-                    email,
                     firstName
                 ];
+
+                // Only add email check if email_id column exists and is mapped
+                if (headerMapping['email_id']) {
+                    const email = record[headerMapping['email_id']];
+                    if (email) {
+                        // Check if email_id column exists in database
+                        const [emailColumnCheck] = await connection.query(`
+                            SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+                            WHERE TABLE_SCHEMA = DATABASE() 
+                            AND TABLE_NAME = 'customers' 
+                            AND COLUMN_NAME = 'email_id'
+                        `);
+
+                        if (emailColumnCheck.length > 0) {
+                            duplicateQuery = `
+                                SELECT * FROM customers 
+                                WHERE company_id = ?
+                                AND (phone_no = ? OR email_id = ?)
+                                AND first_name = ?
+                            `;
+                            queryParams = [
+                                req.user.company_id,
+                                phone,
+                                email,
+                                firstName
+                            ];
+                        }
+                    }
+                }
 
                 const [existingRecords] = await connection.query(duplicateQuery, queryParams);
 
@@ -313,6 +333,10 @@ export const confirmUpload = async (req, res) => {
         connection = await pool.getConnection();
 
         await connection.beginTransaction();
+
+        // Fetch enum definitions dynamically from database
+        const enumDefinitions = await getEnumValues(connection, 'customers');
+
 
         // Process new records first
         if (newRecords && newRecords.length > 0) {

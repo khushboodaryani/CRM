@@ -18,7 +18,7 @@ const LastChanges = ({ customerId, phone_no }) => {
         const token = localStorage.getItem('token');
         const apiUrl = process.env.REACT_APP_API_URL;
         console.log('Fetching changes for customer:', customerId);
-        
+
         const response = await axios.get(
           `${apiUrl}/customers/log-change/${customerId}`,
           {
@@ -47,64 +47,38 @@ const LastChanges = ({ customerId, phone_no }) => {
 
     fetchChangeHistory();
   }, [customerId]); // Fetch history whenever customerId changes
-  
-  // Field name mapping
-  const fieldLabels = {
-    'first_name': 'First Name',
-    'last_name': 'Last Name',
-    'company_name': 'Company Name',
-    'phone_no': 'Phone',
-    'email_id': 'Email',
-    'address': 'Address',
-    'lead_source': 'Lead Source',
-    'call_date_time': 'Call Date Time',
-    'call_status': 'Call Status',
-    'call_outcome': 'Call Outcome',
-    'call_recording': 'Call Recording',
-    'product': 'Product',
-    'budget': 'Budget',
-    'decision_making': 'Decision Making',
-    'decision_time': 'Decision Time',
-    'lead_stage': 'Lead Stage',
-    'next_follow_up': 'Next Follow Up',
-    'assigned_agent': 'Assigned Agent',
-    'reminder_notes': 'Reminder Notes',
-    'priority_level': 'Priority Level',
-    'customer_category': 'Customer Category',
-    'tags_labels': 'Tags/Labels',
-    'communcation_channel': 'Communication Channel',
-    'deal_value': 'Deal Value',
-    'conversion_status': 'Conversion Status',
-    'customer_history': 'Customer History',
-    'comment': 'Comment',
-    'scheduled_at': 'Scheduled At',
-    'agent_name': 'Agent Name'
+
+  // Dynamic field name formatting - converts snake_case to Title Case
+  const formatFieldName = (fieldName) => {
+    return fieldName
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, c => c.toUpperCase());
   };
 
   return (
     <div className="last-changes-container">
-        <div className="last-headi">Update History</div>
-        {changes.length > 0 ? (
-            changes.map((change, index) => (
-            <p className="changes-content" key={index}>
-              <strong>{change.changed_by}</strong> updated <strong>{fieldLabels[change.field] || change.field},</strong>{" "}
-              from <em>{change.old_value || "N/A"}</em>{" "}
-              <strong>to</strong> <em>{change.new_value || "N/A"}</em> {" "}
-              <strong>at</strong> {new Date(change.changed_at).toLocaleString('en-IN', { 
-                timeZone: 'Asia/Kolkata',
-                day: '2-digit', 
-                month: '2-digit', 
-                year: 'numeric', 
-                hour: '2-digit', 
-                minute: '2-digit', 
-                second: '2-digit'
-              })} {" "}
-            </p>
-            ))
-        ) : (
-            <p>No changes detected.</p>
-        )}
-    </div> 
+      <div className="last-headi">Update History</div>
+      {changes.length > 0 ? (
+        changes.map((change, index) => (
+          <p className="changes-content" key={index}>
+            <strong>{change.changed_by}</strong> updated <strong>{formatFieldName(change.field)},</strong>{" "}
+            from <em>{change.old_value || "N/A"}</em>{" "}
+            <strong>to</strong> <em>{change.new_value || "N/A"}</em> {" "}
+            <strong>at</strong> {new Date(change.changed_at).toLocaleString('en-IN', {
+              timeZone: 'Asia/Kolkata',
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit'
+            })} {" "}
+          </p>
+        ))
+      ) : (
+        <p>No changes detected.</p>
+      )}
+    </div>
   );
 };
 

@@ -47,7 +47,9 @@ const AdminPortal = () => {
         email: '',
         team: '',
         role: 'user',
-        permissions: getDefaultPermissions('user')
+        permissions: getDefaultPermissions('user'),
+        isEditing: false,
+        editingUserId: null
     });
 
     // Permission display names mapping
@@ -227,6 +229,137 @@ const AdminPortal = () => {
     };
 
 
+    // Handle edit user - populate form with user data
+    const handleEditUser = (user) => {
+        console.log('=== EDIT USER CLICKED ===');
+        console.log('User data:', user);
+        console.log('User permissions:', user.permissions);
+
+        setNewUser({
+            username: user.username,
+            email: user.email,
+            team: user.team_id || '',
+            role: user.role,
+            permissions: user.permissions ? user.permissions.reduce((acc, perm) => ({ ...acc, [perm]: true }), getDefaultPermissions(user.role)) : getDefaultPermissions(user.role),
+            isEditing: true,
+            editingUserId: user.id
+        });
+
+        console.log('Form state updated, scrolling to top');
+        // Scroll to form
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+
+    // Handle update user
+    const handleUpdateUser = async () => {
+        console.log('=== UPDATE USER CLICKED ===');
+        console.log('Current newUser state:', newUser);
+        console.log('Editing user ID:', newUser.editingUserId);
+
+        try {
+            if (!newUser.username.trim()) {
+                console.log('Validation failed: Username required');
+                setError('Username is required');
+                return;
+            }
+            if (!newUser.email.trim()) {
+                console.log('Validation failed: Email required');
+                setError('Email is required');
+                return;
+            }
+            if (newUser.role !== 'business_head' && newUser.role !== 'mis' && !newUser.team) {
+                console.log('Validation failed: Team required for role:', newUser.role);
+                setError('Team selection is required for users and team leaders');
+                return;
+            }
+
+            const token = localStorage.getItem('token');
+            const apiUrl = process.env.REACT_APP_API_URL;
+
+            const userData = {
+                username: newUser.username.trim(),
+                email: newUser.email.trim(),
+                team_id: (newUser.role === 'business_head' || newUser.role === 'mis') ? null : newUser.team,
+                role_type: newUser.role,
+                permissions: newUser.permissions
+            };
+
+            console.log('Validation passed, preparing API call');
+            console.log('User data to send:', userData);
+
+            const response = await axios.put(
+                `${apiUrl}/players/users/${newUser.editingUserId}`,
+                userData,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            console.log('Update response:', response.data);
+            setSuccess('User updated successfully');
+            setNewUser({
+                username: '',
+                email: '',
+                team: '',
+                role: 'user',
+                permissions: getDefaultPermissions('user'),
+                isEditing: false,
+                editingUserId: null
+            });
+            fetchUsers();
+        } catch (err) {
+            console.error('Error updating user:', err);
+            console.error('Error response:', err.response?.data);
+            setError(err.response?.data?.error || err.response?.data?.details || 'Failed to update user');
+        }
+    };
+
+    // Handle delete user
+    const handleDeleteUser = async (userId, username) => {
+        if (!window.confirm(`Are you sure you want to delete user "${username}"? This action cannot be undone.`)) {
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            const apiUrl = process.env.REACT_APP_API_URL;
+
+            await axios.delete(
+                `${apiUrl}/players/users/${userId}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            setSuccess('User deleted successfully');
+            fetchUsers();
+        } catch (err) {
+            console.error('Error deleting user:', err);
+            setError(err.response?.data?.error || 'Failed to delete user');
+        }
+    };
+
+    // Cancel editing
+    const handleCancelEdit = () => {
+        setNewUser({
+            username: '',
+            email: '',
+            team: '',
+            role: 'user',
+            permissions: getDefaultPermissions('user'),
+            isEditing: false,
+            editingUserId: null
+        });
+    };
+
+
     return (
         <div className="admin-portal-container">
             <div className="admin-portal">
@@ -317,7 +450,16 @@ const AdminPortal = () => {
                             </div>
                         </div>
 
-                        <button onClick={handleCreateUser} className="create-button">Create User</button>
+                        <div className="form-buttons">
+                            {newUser.isEditing ? (
+                                <>
+                                    <button onClick={handleUpdateUser} className="create-button">Update User</button>
+                                    <button onClick={handleCancelEdit} className="cancel-button">Cancel</button>
+                                </>
+                            ) : (
+                                <button onClick={handleCreateUser} className="create-button">Create User</button>
+                            )}
+                        </div>
                     </div>
 
                 </div>
@@ -350,21 +492,29 @@ const AdminPortal = () => {
                                     <div className="user-col">Name</div>
                                     <div className="user-col">Email</div>
                                     <div className="user-col">Role</div>
-                                    {/* <div className="user-col">Permissions</div> */}
+                                    <div className="user-col">Actions</div>
                                 </div>
                                 {sortedTeamUsers.map(user => (
                                     <div key={user.id} className={`user-row ${user.role === 'team_leader' ? 'team-leader-section' : 'user-section'}`}>
                                         <div className="user-col">{user.username}</div>
                                         <div className="user-col">{user.email}</div>
                                         <div className={`user-col role-${user.role}`}>{user.role}</div>
-                                        {/* <div className="user-col">
-                                            {user.permissions && user.permissions.slice(0, 3).map(perm => (
-                                                <span key={perm} className="permission-item">{permissionDisplayNames[perm] || perm}</span>
-                                            ))}
-                                            {user.permissions && user.permissions.length > 3 && (
-                                                <span className="permission-item">+{user.permissions.length - 3} more</span>
-                                            )}
-                                        </div> */}
+                                        <div className="user-col user-actions">
+                                            <button onClick={() => handleEditUser(user)} className="edit-btn" title="Edit User">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                                </svg>
+                                            </button>
+                                            <button onClick={() => handleDeleteUser(user.id, user.username)} className="delete-btn" title="Delete User">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                    <polyline points="3 6 5 6 21 6" />
+                                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                                    <line x1="10" y1="11" x2="10" y2="17" />
+                                                    <line x1="14" y1="11" x2="14" y2="17" />
+                                                </svg>
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -379,21 +529,29 @@ const AdminPortal = () => {
                                 <div className="user-col">Name</div>
                                 <div className="user-col">Email</div>
                                 <div className="user-col">Role</div>
-                                {/* <div className="user-col">Permissions</div> */}
+                                <div className="user-col">Actions</div>
                             </div>
                             {users.filter(user => !user.team_id && user.role !== 'super_admin').map(user => (
                                 <div key={user.id} className="user-row">
                                     <div className="user-col">{user.username}</div>
                                     <div className="user-col">{user.email}</div>
                                     <div className={`user-col role-${user.role}`}>{user.role}</div>
-                                    {/* <div className="user-col">
-                                        {user.permissions && user.permissions.slice(0, 3).map(perm => (
-                                            <span key={perm} className="permission-item">{permissionDisplayNames[perm] || perm}</span>
-                                        ))}
-                                        {user.permissions && user.permissions.length > 3 && (
-                                            <span className="permission-item">+{user.permissions.length - 3} more</span>
-                                        )}
-                                    </div> */}
+                                    <div className="user-col user-actions">
+                                        <button onClick={() => handleEditUser(user)} className="edit-btn" title="Edit User">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                                <path d="M18.5 2.5a2.121 2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                            </svg>
+                                        </button>
+                                        <button onClick={() => handleDeleteUser(user.id, user.username)} className="delete-btn" title="Delete User">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <polyline points="3 6 5 6 21 6" />
+                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                                <line x1="10" y1="11" x2="10" y2="17" />
+                                                <line x1="14" y1="11" x2="14" y2="17" />
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </div>
                             ))}
                         </div>

@@ -26,6 +26,7 @@ const UseForm = () => {
         phone_no: '',
         agent_name: ''
     });
+    const [customFields, setCustomFields] = useState([]);
 
     const [updatedData, setUpdatedData] = useState(formData);
 
@@ -47,8 +48,13 @@ const UseForm = () => {
     };
 
     const validateRequiredFields = () => {
-        const requiredFields = ['first_name', 'email_id', 'phone_no'];
-        const missingFields = requiredFields.filter(field => {
+        const mandatoryFields = ['first_name', 'phone_no', 'agent_name'];
+        const allRequiredFields = [
+            ...mandatoryFields,
+            ...customFields.filter(f => f.IS_NULLABLE === 'NO').map(f => f.COLUMN_NAME)
+        ];
+
+        const missingFields = allRequiredFields.filter(field => {
             const value = formData[field];
             return !value || (typeof value === 'string' && !value.trim());
         });
@@ -153,6 +159,41 @@ const UseForm = () => {
             setLoading(false);
         }
     };
+
+    // Fetch custom fields on component mount
+    useEffect(() => {
+        const fetchCustomFields = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const apiUrl = process.env.REACT_APP_API_URL;
+
+                const response = await axios.get(`${apiUrl}/custom-fields`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+
+                if (response.data.success) {
+                    const systemFields = [
+                        'id', 'created_at', 'updated_at', 'last_updated',
+                        'company_id', 'team_id', 'duplicate_action', 'C_unique_id', 'date_created'
+                    ];
+                    const mandatoryFields = ['first_name', 'phone_no', 'agent_name'];
+
+                    const allFields = response.data.fields.filter(field =>
+                        !systemFields.includes(field.COLUMN_NAME)
+                    );
+
+                    const custom = allFields.filter(field =>
+                        !mandatoryFields.includes(field.COLUMN_NAME)
+                    );
+
+                    setCustomFields(custom);
+                }
+            } catch (err) {
+                console.error('Error fetching custom fields:', err);
+            }
+        };
+        fetchCustomFields();
+    }, []);
 
     useEffect(() => {
         fetchUser();
@@ -317,16 +358,16 @@ const UseForm = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        // First validate required fields
-        const requiredFields = {
-            'first_name': 'First Name',
-            'phone_no': 'Primary Phone Number',
-            'email_id': 'Email'
-        };
+        // Validate required fields dynamically
+        const mandatoryFields = ['first_name', 'phone_no', 'agent_name'];
+        const allRequiredFields = [
+            ...mandatoryFields,
+            ...customFields.filter(f => f.IS_NULLABLE === 'NO').map(f => f.COLUMN_NAME)
+        ];
 
-        const missingFields = Object.entries(requiredFields)
-            .filter(([field]) => !formData[field] || !formData[field].trim())
-            .map(([_, label]) => label);
+        const missingFields = allRequiredFields
+            .filter(field => !formData[field] || (typeof formData[field] === 'string' && !formData[field].trim()))
+            .map(field => field.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()));
 
         if (missingFields.length > 0) {
             alert(`Please fill in the following mandatory details:\n• ${missingFields.join('\n• ')}`);
@@ -391,11 +432,16 @@ const UseForm = () => {
             navigate("/customers");
         } catch (error) {
             console.error('Update error:', error);
+            console.error('Error response:', error.response?.data);
             const backendErrors = error.response?.data?.errors;
             if (backendErrors) {
                 alert(`Update failed: ${backendErrors.join('\n')}`);
+            } else if (error.response?.data?.error) {
+                alert(`Update failed: ${error.response.data.error}`);
+            } else if (error.response?.data?.message) {
+                alert(`Update failed: ${error.response.data.message}`);
             } else {
-                alert('Failed to update customer. Please try again.');
+                alert(`Failed to update customer. Please try again.\nError: ${error.message}`);
             }
         }
     };
@@ -433,61 +479,34 @@ const UseForm = () => {
                         />
                     </div>
                     <form onSubmit={handleSubmit}>
-                        {/* Your input fields */}
-                        {[
-                            ...(editingInfo ? [
-                                {
-                                    label: "First Name", name: "first_name", required: true
-                                },
-                                {
-                                    label: "Last Name", name: "last_name"
-                                },
-                                {
-                                    label: "Phone", name: "phone_no", required: true,
-                                    type: "tel", maxLength: "20"
-                                }
-                            ] : []),
-                            {
-                                label: "Company Name", name: "company_name"
-                            },
-                            {
-                                label: "Email", name: "email_id",
-                                type: "email"
-                            },
-                            {
-                                label: "Address", name: "address"
-                            },
-                            {
-                                label: "Call Recording", name: "call_recording"
-                            },
-                            {
-                                label: "Product", name: "product"
-                            },
-                            {
-                                label: "Budget", name: "budget"
-                            },
-                            {
-                                label: "Assigned Agent", name: "assigned_agent"
-                            },
-                            {
-                                label: "Deal Value", name: "deal_value"
-                            },
-                        ].map(({ label, name, type = "text", disabled, maxLength, required, pattern }) => (
-                            <div key={name} className="label-input">
-                                <label>{label}{required && <span className="required"> *</span>}:</label>
-                                <input
-                                    type={type}
-                                    name={name}
-                                    value={formData[name] || ''}
-                                    onChange={handleInputChange}
-                                    disabled={disabled}
-                                    maxLength={maxLength}
-                                    pattern={pattern}
-                                />
-                            </div>
-                        ))}
+                        {/* Editable Basic Info - shown when edit icon clicked */}
+                        {editingInfo && (
+                            <>
+                                <div className="label-input">
+                                    <label>First Name<span className="required"> *</span>:</label>
+                                    <input
+                                        type="text"
+                                        name="first_name"
+                                        value={formData.first_name || ''}
+                                        onChange={handleInputChange}
+                                        required
+                                    />
+                                </div>
+                                <div className="label-input">
+                                    <label>Phone<span className="required"> *</span>:</label>
+                                    <input
+                                        type="text"
+                                        name="phone_no"
+                                        value={formData.phone_no || ''}
+                                        onChange={handleInputChange}
+                                        maxLength={15}
+                                        required
+                                    />
+                                </div>
+                            </>
+                        )}
 
-                        {/* Agent Name Field */}
+                        {/* Agent Name - Always shown, always disabled */}
                         <div className="label-input">
                             <label>Agent Name:</label>
                             <input
@@ -499,188 +518,95 @@ const UseForm = () => {
                             />
                         </div>
 
-                        {/* Lead Source Dropdown */}
-                        <div className="label-input">
-                            <label>Lead Source:</label>
-                            <select name="lead_source" value={formData.lead_source} onChange={handleInputChange}>
-                                <option value="website">Website</option>
-                                <option value="data">Data</option>
-                                <option value="referral">Referral</option>
-                                <option value="ads">Ads</option>
-                            </select>
-                        </div>
+                        {/* Dynamic Custom Fields */}
+                        {customFields.map(field => {
+                            const isRequired = field.IS_NULLABLE === 'NO';
+                            const label = field.COLUMN_NAME.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
-                        {/* Call Date Time */}
-                        <div className="label-input">
-                            <label>Call Date Time:</label>
-                            <input
-                                type="datetime-local"
-                                name="call_date_time"
-                                value={formData.call_date_time || ''}
-                                onChange={handleInputChange}
-                            />
-                        </div>
+                            // Handle ENUM fields
+                            if (field.DATA_TYPE === 'enum') {
+                                const options = field.COLUMN_TYPE.match(/'([^']+)'/g)?.map(s => s.replace(/'/g, '')) || [];
 
-                        {/* Call Status Dropdown */}
-                        <div className="label-input">
-                            <label>Call Status:</label>
-                            <select name="call_status" value={formData.call_status} onChange={handleInputChange}>
-                                <option value="connected">Connected</option>
-                                <option value="not_connected">Not Connected</option>
-                                <option value="follow_up">Follow Up</option>
-                            </select>
-                        </div>
+                                return (
+                                    <div key={field.COLUMN_NAME} className="label-input">
+                                        <label>{label}{isRequired && <span className="required"> *</span>}:</label>
+                                        <select
+                                            name={field.COLUMN_NAME}
+                                            value={formData[field.COLUMN_NAME] || ''}
+                                            onChange={handleInputChange}
+                                            required={isRequired}
+                                        >
+                                            <option value="">Select {label}</option>
+                                            {options.map(opt => (
+                                                <option key={opt} value={opt}>{opt.replace(/_/g, ' ')}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                );
+                            }
 
-                        {/* Call Outcome Dropdown */}
-                        <div className="label-input">
-                            <label>Call Outcome:</label>
-                            <select name="call_outcome" value={formData.call_outcome} onChange={handleInputChange}>
-                                <option value="interested">Interested</option>
-                                <option value="not_interested">Not Interested</option>
-                                <option value="call_later">Call Later</option>
-                                <option value="wrong_number">Wrong Number</option>
-                            </select>
-                        </div>
+                            // Handle TEXT/LONGTEXT fields
+                            if (['text', 'longtext', 'mediumtext'].includes(field.DATA_TYPE.toLowerCase())) {
+                                return (
+                                    <div key={field.COLUMN_NAME} className="label-input comment">
+                                        <label>{label}{isRequired && <span className="required"> *</span>}:</label>
+                                        <div className="textarea-container">
+                                            <textarea
+                                                name={field.COLUMN_NAME}
+                                                value={formData[field.COLUMN_NAME] || ''}
+                                                onChange={handleInputChange}
+                                                required={isRequired}
+                                                rows={4}
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            }
 
-                        {/* Decision Making Dropdown */}
-                        <div className="label-input">
-                            <label>Decision Making:</label>
-                            <select name="decision_making" value={formData.decision_making} onChange={handleInputChange}>
-                                <option value="yes">Yes</option>
-                                <option value="no">No</option>
-                            </select>
-                        </div>
+                            // Determine input type
+                            let inputType = 'text';
+                            if (['int', 'decimal', 'float', 'double', 'bigint'].includes(field.DATA_TYPE.toLowerCase())) {
+                                inputType = 'number';
+                            } else if (field.DATA_TYPE.toLowerCase() === 'date') {
+                                inputType = 'date';
+                            } else if (['datetime', 'timestamp'].includes(field.DATA_TYPE.toLowerCase())) {
+                                inputType = 'datetime-local';
+                            }
 
-                        {/* Decision Time Dropdown */}
-                        <div className="label-input">
-                            <label>Decision Time:</label>
-                            <select name="decision_time" value={formData.decision_time} onChange={handleInputChange}>
-                                <option value="immediate">Immediate</option>
-                                <option value="1_week">1 Week</option>
-                                <option value="1_month">1 Month</option>
-                                <option value="future_investment">Future Investment</option>
-                            </select>
-                        </div>
+                            // Special handling for scheduled_at
+                            if (field.COLUMN_NAME === 'scheduled_at') {
+                                return (
+                                    <div key={field.COLUMN_NAME} className="label-input">
+                                        <label>{label}{isRequired && <span className="required"> *</span>}:</label>
+                                        <input
+                                            type="datetime-local"
+                                            name={field.COLUMN_NAME}
+                                            value={formData[field.COLUMN_NAME] || ''}
+                                            onChange={handleInputChange}
+                                            onKeyDown={(e) => e.preventDefault()}
+                                            onClick={handleScheduledAtClick}
+                                            style={{ cursor: 'pointer' }}
+                                            className="sche_input"
+                                            required={isRequired}
+                                        />
+                                    </div>
+                                );
+                            }
 
-                        {/* Lead Stage Dropdown */}
-                        <div className="label-input">
-                            <label>Lead Stage:</label>
-                            <select name="lead_stage" value={formData.lead_stage} onChange={handleInputChange}>
-                                <option value="new">New</option>
-                                <option value="in_progress">In Progress</option>
-                                <option value="qualified">Qualified</option>
-                                <option value="converted">Converted</option>
-                                <option value="lost">Lost</option>
-                            </select>
-                        </div>
-
-
-                        {/* Priority Level Dropdown */}
-                        <div className="label-input">
-                            <label>Priority Level:</label>
-                            <select name="priority_level" value={formData.priority_level} onChange={handleInputChange}>
-                                <option value="low">Low</option>
-                                <option value="medium">Medium</option>
-                                <option value="high">High</option>
-                            </select>
-                        </div>
-
-                        {/* Customer Category Dropdown */}
-                        <div className="label-input">
-                            <label>Customer Category:</label>
-                            <select name="customer_category" value={formData.customer_category} onChange={handleInputChange}>
-                                <option value="hot">Hot</option>
-                                <option value="warm">Warm</option>
-                                <option value="cold">Cold</option>
-                            </select>
-                        </div>
-
-                        {/* Tags/Labels Dropdown */}
-                        <div className="label-input">
-                            <label>Tags/Labels:</label>
-                            <select name="tags_labels" value={formData.tags_labels} onChange={handleInputChange}>
-                                <option value="premium_customer">Premium Customer</option>
-                                <option value="repeat_customer">Repeat Customer</option>
-                                <option value="demo_required">Demo Required</option>
-                            </select>
-                        </div>
-
-                        {/* Communication Channel Dropdown */}
-                        <div className="label-input">
-                            <label>Communication Channel:</label>
-                            <select name="communcation_channel" value={formData.communcation_channel} onChange={handleInputChange}>
-                                <option value="call">Call</option>
-                                <option value="whatsapp">WhatsApp</option>
-                                <option value="email">Email</option>
-                                <option value="sms">SMS</option>
-                            </select>
-                        </div>
-
-                        {/* Conversion Status Dropdown */}
-                        <div className="label-input">
-                            <label>Conversion Status:</label>
-                            <select name="conversion_status" value={formData.conversion_status} onChange={handleInputChange}>
-                                <option value="lead">Lead</option>
-                                <option value="opportunity">Opportunity</option>
-                                <option value="customer">Customer</option>
-                            </select>
-                        </div>
-
-                        {/* Customer History Dropdown */}
-                        <div className="label-input">
-                            <label>Customer History:</label>
-                            <select name="customer_history" value={formData.customer_history} onChange={handleInputChange}>
-                                <option value="previous calls">Previous Calls</option>
-                                <option value="purchases">Purchases</option>
-                                <option value="interactions78">Interactions</option>
-                            </select>
-                        </div>
-
-                        {/* Schedule Call  */}
-                        <div className="label-input">
-                            <label>Next Follow Up:</label>
-                            <input
-                                type="datetime-local"
-                                name="scheduled_at"
-                                value={formData.scheduled_at || ''}
-                                onChange={handleInputChange}
-                                onKeyDown={(e) => e.preventDefault()}
-                                onClick={handleScheduledAtClick}
-                                style={{ cursor: 'pointer' }}
-                                className="sche_input"
-                            />
-                        </div>
-
-                        {/* Reminder Notes Section */}
-                        <div className="label-input comment">
-                            <label>Reminder Notes:</label>
-                            <div className="textarea-container">
-                                <textarea
-                                    name="reminder_notes"
-                                    value={formData.reminder_notes || ''}
-                                    onChange={handleInputChange}
-                                    rows="4"
-                                    placeholder="Enter reminder notes"
-                                    className="comet"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Comment Section */}
-                        {/* <div className="label-input comment">
-                            <label>Comment:</label>
-                            <div className="textarea-container">
-                                <textarea
-                                    name="comment"
-                                    value={formData.comment || ''}
-                                    onChange={handleInputChange}
-                                    rows="6"
-                                    maxLength={1000}
-                                    placeholder="Enter any additional comment"
-                                    className="comet"
-                                />
-                            </div>
-                        </div> */}
+                            // Default input rendering
+                            return (
+                                <div key={field.COLUMN_NAME} className="label-input">
+                                    <label>{label}{isRequired && <span className="required"> *</span>}:</label>
+                                    <input
+                                        type={inputType}
+                                        name={field.COLUMN_NAME}
+                                        value={formData[field.COLUMN_NAME] || ''}
+                                        onChange={handleInputChange}
+                                        required={isRequired}
+                                    />
+                                </div>
+                            );
+                        })}
 
                         <button className="sbt-use-btn" type="submit">Update</button>
                     </form>
