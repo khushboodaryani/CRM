@@ -1,117 +1,15 @@
 // src/controllers/uploadFile.js
 
+import { v4 as uuid } from 'uuid';
+import { getDistributor } from '../utils/distributionHelper.js';
 import connectDB from '../db/index.js';
 import { getEnumValues } from '../utils/enumHelper.js';
-import { v4 as uuid } from 'uuid';
 
-// Use a Map to store upload data temporarily
 const uploadDataStore = new Map();
-
-// Helper function to validate and clean enum values
-const validateEnumValue = (value, enumValues) => {
-    if (!value) return null;
-    const cleanValue = String(value).trim().toLowerCase();
-
-    // Find exact match first
-    const exactMatch = enumValues.find(enumVal => enumVal.toLowerCase() === cleanValue);
-    if (exactMatch) return exactMatch;
-
-    // Find partial match (for cases like "lead (Corrected...)" -> "lead")
-    const partialMatch = enumValues.find(enumVal => cleanValue.includes(enumVal.toLowerCase()));
-    if (partialMatch) return partialMatch;
-
-    // Return null if no match found
-    return null;
-};
-
-
-// Enum definitions will be fetched dynamically from database
-
-
-// Helper function to format date
-const formatDate = (dateStr) => {
-    if (!dateStr) return null;
-
-    // Convert to string and trim
-    const strDate = String(dateStr).trim();
-    if (!strDate) return null;
-
-    try {
-        // Check if it's an Excel serial number (numeric with possible decimal)
-        const numericDate = parseFloat(strDate);
-        if (!isNaN(numericDate) && numericDate > 1 && numericDate < 100000) {
-            // Excel date starting point (January 1, 1900, but Excel incorrectly treats 1900 as a leap year)
-            // So we use December 30, 1899 as the epoch
-            const excelEpoch = new Date(1899, 11, 30);
-
-            // Calculate days and fractional day (time portion)
-            const wholeDays = Math.floor(numericDate);
-            const timeFraction = numericDate - wholeDays;
-
-            // Add days to epoch
-            const date = new Date(excelEpoch.getTime() + (wholeDays * 24 * 60 * 60 * 1000));
-
-            // Add time portion (fractional day converted to milliseconds)
-            if (timeFraction > 0) {
-                const timeMs = Math.round(timeFraction * 24 * 60 * 60 * 1000);
-                date.setTime(date.getTime() + timeMs);
-            }
-
-            // Validate the resulting date
-            if (!isNaN(date.getTime()) && date.getFullYear() >= 1900 && date.getFullYear() <= 2100) {
-                // Return full datetime format for MySQL DATETIME column
-                const year = date.getFullYear();
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const day = String(date.getDate()).padStart(2, '0');
-                const hours = String(date.getHours()).padStart(2, '0');
-                const minutes = String(date.getMinutes()).padStart(2, '0');
-                const seconds = String(date.getSeconds()).padStart(2, '0');
-
-                return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-            }
-        }
-
-        // Try parsing as ISO datetime string (YYYY-MM-DD HH:MM:SS)
-        if (strDate.includes('-') && strDate.includes(':')) {
-            const date = new Date(strDate);
-            if (!isNaN(date.getTime()) && date.getFullYear() >= 1900 && date.getFullYear() <= 2100) {
-                return date.toISOString().slice(0, 19).replace('T', ' ');
-            }
-        }
-
-        // Try DD/MM/YYYY format
-        const parts = strDate.split('/');
-        if (parts.length === 3) {
-            const day = parseInt(parts[0], 10);
-            const month = parseInt(parts[1], 10);
-            const year = parseInt(parts[2], 10);
-
-            if (day > 0 && day <= 31 &&
-                month > 0 && month <= 12 &&
-                year >= 1900 && year <= 2100) {
-                const paddedDay = day.toString().padStart(2, '0');
-                const paddedMonth = month.toString().padStart(2, '0');
-                return `${year}-${paddedMonth}-${paddedDay} 00:00:00`;
-            }
-        }
-
-        // Try parsing as regular date string
-        const date = new Date(strDate);
-        if (!isNaN(date.getTime()) && date.getFullYear() >= 1900 && date.getFullYear() <= 2100) {
-            return date.toISOString().slice(0, 19).replace('T', ' ');
-        }
-
-        console.warn(`Invalid date format for value: ${strDate}`);
-        return null;
-    } catch (error) {
-        console.error(`Error formatting date: ${strDate}`, error);
-        return null;
-    }
-};
 
 export const uploadCustomerData = async (req, res) => {
     try {
-        const { headerMapping, customerData } = req.body;
+        const { headerMapping, customerData, distributionOptions } = req.body;
 
         if (!headerMapping || typeof headerMapping !== 'object' || Object.keys(headerMapping).length === 0) {
             return res.status(400).json({ message: 'Invalid header mapping provided' });
@@ -130,49 +28,47 @@ export const uploadCustomerData = async (req, res) => {
             // Fetch enum definitions dynamically from database
             const enumDefinitions = await getEnumValues(connection, 'customers');
 
-            // Get valid agent usernames from users table
+            // Get all users for validation and mapping
             const [userResults] = await connection.query(
-                'SELECT username, team_id FROM users'
+                'SELECT id, username, team_id FROM users'
             );
 
             if (userResults.length === 0) {
-                return res.status(400).json({
-                    message: 'No users found in the system.'
-                });
+                return res.status(400).json({ message: 'No users found in the system.' });
             }
 
-            // Create a map of valid usernames and their team_ids
-            const validAgents = new Map(userResults.map(user => [user.username, user.team_id]));
+            // Create maps for quick lookup
+            const validAgents = new Map(userResults.map(user => [user.username, user.team_id])); // Name -> TeamID
+            const userMap = new Map(userResults.map(user => [user.id, user])); // ID -> UserObj
 
-            // Validate agent names exist in users table
-            const agentValidationPromises = customerData.map(async (record, index) => {
-                const agentName = record[headerMapping['agent_name']];
-                if (!agentName) return { valid: false, index, agentName: 'empty' };
-
-                const [agentResult] = await connection.query(
-                    'SELECT username FROM users WHERE username = ?',
-                    [agentName]
-                );
-
-                return {
-                    valid: agentResult.length > 0,
-                    index,
-                    agentName
-                };
-            });
-
-            const agentValidations = await Promise.all(agentValidationPromises);
-            const invalidAgents = agentValidations.filter(v => !v.valid);
-
-            if (invalidAgents.length > 0) {
-                await connection.rollback();
-                return res.status(400).json({
-                    error: 'Invalid agent names found',
-                    invalidAgents: invalidAgents.map(agent => ({
-                        index: agent.index,
-                        agentName: agent.agentName
-                    }))
+            // Initialize distributor if options provided
+            let distributor = null;
+            if (distributionOptions) {
+                distributor = await getDistributor(connection, {
+                    ...distributionOptions,
+                    companyId: req.user.company_id
                 });
+            } else {
+                // Only validate agent names from CSV if NO auto-distribution
+                const agentValidationPromises = customerData.map(async (record, index) => {
+                    const agentName = record[headerMapping['agent_name']];
+                    if (!agentName) return { valid: false, index, agentName: 'empty' };
+                    return { valid: validAgents.has(agentName), index, agentName };
+                });
+
+                const agentValidations = await Promise.all(agentValidationPromises);
+                const invalidAgents = agentValidations.filter(v => !v.valid);
+
+                if (invalidAgents.length > 0) {
+                    await connection.rollback();
+                    return res.status(400).json({
+                        error: 'Invalid agent names found',
+                        invalidAgents: invalidAgents.map(agent => ({
+                            index: agent.index,
+                            agentName: agent.agentName
+                        }))
+                    });
+                }
             }
 
             // Check for duplicates first
@@ -183,16 +79,38 @@ export const uploadCustomerData = async (req, res) => {
             for (const record of customerData) {
                 const phone = record[headerMapping['phone_no']];
                 const firstName = record[headerMapping['first_name']];
-                const agentName = record[headerMapping['agent_name']];
 
-                // Skip empty records
-                if (!firstName || !phone || !agentName) {
+                // If distribution is active, agentName might not be in CSV
+                let agentName = record[headerMapping['agent_name']];
+                let teamId = null;
+                let assignedUserId = null;
+
+                // Logic to determine Agent & Team
+                if (distributor) {
+                    // Auto-assign using distributor logic
+                    const assignment = await distributor();
+                    assignedUserId = assignment.assigned_to;
+                    teamId = assignment.team_id;
+
+                    if (assignedUserId) {
+                        const user = userMap.get(assignedUserId);
+                        if (user) agentName = user.username;
+                    }
+                } else {
+                    // Manual CSV mapping
+                    if (!agentName) continue; // Skip if no agent in CSV and no auto-dist
+                    teamId = validAgents.get(agentName);
+                    // Find user ID for this agent name (optional, but good for consistency)
+                    const user = userResults.find(u => u.username === agentName);
+                    if (user) assignedUserId = user.id;
+                }
+
+                // Skip empty records (now checking agentName which might be auto-filled)
+                if (!firstName || !phone || (!agentName && !teamId)) {
                     continue;
                 }
 
                 // Build dynamic duplicate check query
-                // Only check phone_no and first_name (guaranteed to exist)
-                // email_id is optional and may not exist in minimal schema
                 let duplicateQuery = `
                     SELECT * FROM customers 
                     WHERE company_id = ?
@@ -200,17 +118,11 @@ export const uploadCustomerData = async (req, res) => {
                     AND first_name = ?
                 `;
 
-                let queryParams = [
-                    req.user.company_id,
-                    phone,
-                    firstName
-                ];
+                let queryParams = [req.user.company_id, phone, firstName];
 
-                // Only add email check if email_id column exists and is mapped
                 if (headerMapping['email_id']) {
                     const email = record[headerMapping['email_id']];
                     if (email) {
-                        // Check if email_id column exists in database
                         const [emailColumnCheck] = await connection.query(`
                             SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
                             WHERE TABLE_SCHEMA = DATABASE() 
@@ -225,43 +137,44 @@ export const uploadCustomerData = async (req, res) => {
                                 AND (phone_no = ? OR email_id = ?)
                                 AND first_name = ?
                             `;
-                            queryParams = [
-                                req.user.company_id,
-                                phone,
-                                email,
-                                firstName
-                            ];
+                            queryParams = [req.user.company_id, phone, email, firstName];
                         }
                     }
                 }
 
                 const [existingRecords] = await connection.query(duplicateQuery, queryParams);
 
+                const processedRecord = {
+                    ...record,
+                    agent_name: agentName,
+                    team_id: teamId,
+                    assigned_user_id: assignedUserId, // Store ID for update tracking
+                    department_id: distributionOptions?.departmentId || null,
+                    sub_department_id: distributionOptions?.subDepartmentId || null,
+                    team_id: teamId // teamId is already determined above
+                };
+
                 if (existingRecords.length > 0) {
                     duplicates.push({
-                        new_record: record,
+                        new_record: processedRecord,
                         existing_record: existingRecords[0],
                         agent_name: agentName,
-                        team_id: validAgents.get(agentName)
+                        team_id: teamId
                     });
                 } else {
-                    newRecords.push({
-                        ...record,
-                        agent_name: agentName,
-                        team_id: validAgents.get(agentName)
-                    });
+                    newRecords.push(processedRecord);
                 }
             }
 
             // Generate a unique upload ID
             const uploadId = uuid();
 
-            // Store the processed data with agent information
+            // Store the processed data
             uploadDataStore.set(uploadId, {
                 newRecords,
                 duplicates,
                 headerMapping,
-                validAgents: Object.fromEntries(validAgents)
+                distributionActive: !!distributor
             });
 
             await connection.commit();
@@ -304,29 +217,15 @@ export const confirmUpload = async (req, res) => {
     try {
         const { uploadId, proceed, duplicateActions } = req.body;
 
-        if (!uploadId) {
-            return res.status(400).json({
-                success: false,
-                message: 'Upload ID is required'
-            });
-        }
+        if (!uploadId) return res.status(400).json({ success: false, message: 'Upload ID is required' });
 
         if (!proceed) {
             uploadDataStore.delete(uploadId);
-            return res.json({
-                success: true,
-                message: 'Upload cancelled',
-                recordsUploaded: 0
-            });
+            return res.json({ success: true, message: 'Upload cancelled', recordsUploaded: 0 });
         }
 
         const uploadData = uploadDataStore.get(uploadId);
-        if (!uploadData) {
-            return res.status(404).json({
-                success: false,
-                message: 'Upload data not found or expired. Please try uploading again.'
-            });
-        }
+        if (!uploadData) return res.status(404).json({ success: false, message: 'Upload data expired.' });
 
         const { duplicates = [], newRecords = [], headerMapping } = uploadData;
         const pool = await connectDB();
@@ -334,148 +233,115 @@ export const confirmUpload = async (req, res) => {
 
         await connection.beginTransaction();
 
-        // Fetch enum definitions dynamically from database
         const enumDefinitions = await getEnumValues(connection, 'customers');
+        const assignedUserIds = new Set(); // Track users to update stats
 
-
-        // Process new records first
+        // Process new records
         if (newRecords && newRecords.length > 0) {
-            // Get the latest C_unique_id
             const [lastIdResult] = await connection.query(
                 'SELECT C_unique_id FROM customers ORDER BY CAST(SUBSTRING(C_unique_id, 4) AS UNSIGNED) DESC LIMIT 1'
             );
-
             const lastId = lastIdResult[0]?.C_unique_id || 'FF_0';
-            const lastNumericPart = parseInt(lastId.split('_')[1]) || 0;
-            let nextId = lastNumericPart + 1;
+            let nextId = (parseInt(lastId.split('_')[1]) || 0) + 1;
 
-            // First, get all column names in order
             const [columns] = await connection.query('SHOW COLUMNS FROM customers');
             const columnNames = columns.map(col => col.Field)
                 .filter(name => !['id', 'date_created', 'last_updated', 'scheduled_at'].includes(name));
 
+            // Ensure team_id and agent_name are in columns if they exist in schema
+            // Assuming they are standard columns. If not, filtered out.
+
             const insertQuery = `INSERT INTO customers (${columnNames.join(', ')}) VALUES ?`;
-
             const values = newRecords.map(record => {
-                const values = [];
-                columnNames.forEach(colName => {
-                    if (colName === 'C_unique_id') {
-                        values.push(`FF_${nextId++}`);
-                    } else if (colName === 'company_id') {
-                        // Set company_id from authenticated user
-                        values.push(req.user.company_id);
-                    } else {
-                        // Apply date formatting to datetime columns
-                        const dateTimeColumns = ['call_date_time', 'next_follow_up'];
-                        let value = record[headerMapping[colName]] || null;
+                if (record.assigned_user_id) assignedUserIds.add(record.assigned_user_id);
 
-                        if (dateTimeColumns.includes(colName)) {
-                            value = formatDate(value);
-                        } else if (enumDefinitions[colName]) {
-                            // Validate and clean enum values
-                            value = validateEnumValue(value, enumDefinitions[colName]);
-                        }
-                        values.push(value);
-                    }
+                return columnNames.map(colName => {
+                    if (colName === 'C_unique_id') return `FF_${nextId++}`;
+                    if (colName === 'company_id') return req.user.company_id;
+
+                    // Prioritize our calculated values for agent_name/team_id/assigned_to
+                    if (colName === 'agent_name' && record.agent_name !== undefined) return record.agent_name;
+                    if (colName === 'team_id' && record.team_id !== undefined) return record.team_id;
+                    if (colName === 'assigned_to' && record.assigned_user_id !== undefined) return record.assigned_user_id;
+
+                    if (colName === 'department_id' && record.department_id) return record.department_id;
+                    if (colName === 'sub_department_id' && record.sub_department_id) return record.sub_department_id;
+
+                    const dateTimeColumns = ['call_date_time', 'next_follow_up'];
+                    let value = record[headerMapping[colName]] || null;
+
+                    if (dateTimeColumns.includes(colName)) value = formatDate(value);
+                    else if (enumDefinitions[colName]) value = validateEnumValue(value, enumDefinitions[colName]);
+
+                    return value;
                 });
-                return values;
             });
 
             const [insertResult] = await connection.query(insertQuery, [values]);
             recordsUploaded += insertResult.affectedRows;
         }
 
-        // Handle duplicate records based on individual actions
+        // Process duplicates... (Existing logic mostly, just need to ensure assignedUserIds are tracked if action=append/replace)
         if (duplicates && duplicates.length > 0) {
             for (const [index, duplicate] of duplicates.entries()) {
                 const action = duplicateActions[index] || 'skip';
                 if (action === 'skip') continue;
 
                 const record = duplicate.new_record;
+                if (record.assigned_user_id) assignedUserIds.add(record.assigned_user_id);
+                // ... (Existing duplicate logic logic - condensed for brevity as it is largely same but needs access to `record` variables)
+                // RE-INSERTING THE DUPLICATE LOGIC BLOCK HERE TO ENSURE INTEGRITY
+
                 const existingRecord = duplicate.existing_record;
 
                 if (action === 'append') {
-                    // Get the base C_unique_id from the existing record
-                    const baseId = existingRecord.C_unique_id.split('__')[0]; // Get the base part before any __
-
-                    // Find all records with this base ID to determine next suffix
+                    const baseId = existingRecord.C_unique_id.split('__')[0];
                     const [suffixResults] = await connection.query(
                         'SELECT C_unique_id FROM customers WHERE C_unique_id LIKE ? OR C_unique_id = ? ORDER BY CAST(SUBSTRING_INDEX(C_unique_id, "__", -1) AS UNSIGNED) DESC LIMIT 1',
                         [`${baseId}__%`, baseId]
                     );
 
-                    let newCUniqueId;
-                    if (suffixResults.length === 0 || suffixResults[0].C_unique_id === baseId) {
-                        // No suffixed records exist yet
-                        newCUniqueId = `${baseId}__1`;
-                    } else {
-                        // Get the highest suffix and increment
-                        const currentId = suffixResults[0].C_unique_id;
-                        const currentSuffix = parseInt(currentId.split('__')[1]);
-                        newCUniqueId = `${baseId}__${currentSuffix + 1}`;
-                    }
+                    let newCUniqueId = (suffixResults.length === 0 || suffixResults[0].C_unique_id === baseId)
+                        ? `${baseId}__1`
+                        : `${baseId}__${parseInt(suffixResults[0].C_unique_id.split('__')[1]) + 1}`;
 
-                    // Get column names
                     const [columns] = await connection.query('SHOW COLUMNS FROM customers');
-                    const columnNames = columns.map(col => col.Field)
-                        .filter(name => !['id', 'date_created', 'last_updated', 'scheduled_at'].includes(name));
-
+                    const columnNames = columns.map(col => col.Field).filter(n => !['id', 'date_created', 'last_updated', 'scheduled_at'].includes(n));
                     const insertQuery = `INSERT INTO customers (${columnNames.join(', ')}) VALUES (${columnNames.map(() => '?').join(', ')})`;
 
                     const values = columnNames.map(colName => {
-                        if (colName === 'C_unique_id') {
-                            return newCUniqueId;
-                        } else if (colName === 'company_id') {
-                            // Set company_id from authenticated user
-                            return req.user.company_id;
-                        } else {
-                            // Apply date formatting to datetime columns
-                            const dateTimeColumns = ['call_date_time', 'next_follow_up'];
-                            let value = record[headerMapping[colName]] || null;
+                        if (colName === 'C_unique_id') return newCUniqueId;
+                        if (colName === 'company_id') return req.user.company_id;
+                        if (colName === 'agent_name' && record.agent_name !== undefined) return record.agent_name;
+                        if (colName === 'team_id' && record.team_id !== undefined) return record.team_id;
+                        if (colName === 'assigned_to' && record.assigned_user_id !== undefined) return record.assigned_user_id;
 
-                            if (dateTimeColumns.includes(colName)) {
-                                value = formatDate(value);
-                            } else if (enumDefinitions[colName]) {
-                                // Validate and clean enum values
-                                value = validateEnumValue(value, enumDefinitions[colName]);
-                            }
-                            return value;
-                        }
+                        let value = record[headerMapping[colName]] || null;
+                        if (['call_date_time', 'next_follow_up'].includes(colName)) value = formatDate(value);
+                        else if (enumDefinitions[colName]) value = validateEnumValue(value, enumDefinitions[colName]);
+                        return value;
                     });
 
                     const [insertResult] = await connection.query(insertQuery, values);
                     recordsUploaded += insertResult.affectedRows;
 
                 } else if (action === 'replace') {
-                    // Get column names for update
                     const [columns] = await connection.query('SHOW COLUMNS FROM customers');
-                    const columnNames = columns.map(col => col.Field)
-                        .filter(name => !['id', 'C_unique_id', 'date_created', 'last_updated', 'scheduled_at'].includes(name));
-
-                    const updateQuery = `UPDATE customers SET ${columnNames.map(col => `${col} = ?`).join(', ')
-                        } WHERE phone_no = ? AND first_name = ?`;
+                    const columnNames = columns.map(col => col.Field).filter(n => !['id', 'C_unique_id', 'date_created', 'last_updated', 'scheduled_at'].includes(n));
+                    const updateQuery = `UPDATE customers SET ${columnNames.map(c => `${c} = ?`).join(', ')} WHERE phone_no = ? AND first_name = ?`;
 
                     const values = columnNames.map(colName => {
-                        if (colName === 'company_id') {
-                            // Keep existing company_id (don't change it during update)
-                            return req.user.company_id;
-                        }
-                        // Apply date formatting to datetime columns
-                        const dateTimeColumns = ['call_date_time', 'next_follow_up'];
-                        let value = record[headerMapping[colName]] || null;
+                        if (colName === 'company_id') return req.user.company_id;
+                        if (colName === 'agent_name' && record.agent_name !== undefined) return record.agent_name;
+                        if (colName === 'team_id' && record.team_id !== undefined) return record.team_id;
+                        if (colName === 'assigned_to' && record.assigned_user_id !== undefined) return record.assigned_user_id;
 
-                        if (dateTimeColumns.includes(colName)) {
-                            value = formatDate(value);
-                        } else if (enumDefinitions[colName]) {
-                            // Validate and clean enum values
-                            value = validateEnumValue(value, enumDefinitions[colName]);
-                        }
+                        let value = record[headerMapping[colName]] || null;
+                        if (['call_date_time', 'next_follow_up'].includes(colName)) value = formatDate(value);
+                        else if (enumDefinitions[colName]) value = validateEnumValue(value, enumDefinitions[colName]);
                         return value;
                     });
-
-                    // Add WHERE clause values
-                    values.push(record[headerMapping['phone_no']]);
-                    values.push(record[headerMapping['first_name']]);
+                    values.push(record[headerMapping['phone_no']], record[headerMapping['first_name']]);
 
                     const [updateResult] = await connection.query(updateQuery, values);
                     recordsUploaded += updateResult.affectedRows;
@@ -483,38 +349,24 @@ export const confirmUpload = async (req, res) => {
             }
         }
 
+        // UPDATE ROUND ROBIN STATS
+        if (assignedUserIds.size > 0) {
+            const ids = Array.from(assignedUserIds);
+            await connection.query(
+                `UPDATE users SET last_assigned_at = NOW() WHERE id IN (?)`,
+                [ids]
+            );
+        }
+
         await connection.commit();
         uploadDataStore.delete(uploadId);
-
-        res.status(200).json({
-            success: true,
-            message: `Successfully processed ${recordsUploaded} records`,
-            recordsUploaded
-        });
+        res.status(200).json({ success: true, message: `Successfully processed ${recordsUploaded} records`, recordsUploaded });
 
     } catch (error) {
         console.error('Error in confirmUpload:', error);
-
-        if (connection) {
-            try {
-                await connection.rollback();
-            } catch (rollbackError) {
-                console.error('Error rolling back transaction:', rollbackError);
-            }
-        }
-
-        res.status(500).json({
-            success: false,
-            message: 'Failed to process upload confirmation',
-            error: error.message
-        });
+        if (connection) await connection.rollback();
+        res.status(500).json({ success: false, message: 'Failed to process upload confirmation', error: error.message });
     } finally {
-        if (connection) {
-            try {
-                connection.release();
-            } catch (releaseError) {
-                console.error('Error releasing connection:', releaseError);
-            }
-        }
+        if (connection) connection.release();
     }
 };

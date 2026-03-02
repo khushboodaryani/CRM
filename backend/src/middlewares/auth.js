@@ -36,7 +36,7 @@ export const authenticateToken = async (req, res, next) => {
         const connection = await pool.getConnection();
         try {
             const [users] = await connection.query(`
-                SELECT GROUP_CONCAT(p.permission_name) as permissions
+                SELECT u.requires_delete_approval, GROUP_CONCAT(p.permission_name) as permissions
                 FROM users u
                 LEFT JOIN user_permissions up ON u.id = up.user_id
                 LEFT JOIN permissions p ON up.permission_id = p.id AND up.value = true
@@ -65,11 +65,13 @@ export const authenticateToken = async (req, res, next) => {
                 role: decoded.role,
                 company_id: decoded.company_id || null, // CRITICAL: For multi-tenant data isolation
                 team_id: decoded.team_id ? parseInt(decoded.team_id) : null,
-                permissions: currentPermissions // Use current permissions from database
+                permissions: currentPermissions, // Use current permissions from database
+                requires_delete_approval: users[0]?.requires_delete_approval === 1 || users[0]?.requires_delete_approval === true
             };
 
             console.log('Set request user:', req.user);
             next();
+
         } finally {
             connection.release();
         }

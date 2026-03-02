@@ -4,6 +4,13 @@ import connectDB from '../db/index.js';
 import bcrypt from 'bcrypt';
 import nodemailer from 'nodemailer';
 
+// Roles that consume admin license slots
+const ADMIN_ROLES = ['business_head', 'dept_admin', 'sub_dept_admin'];
+// Roles that consume user license slots
+const USER_ROLES = ['team_leader', 'user', 'mis'];
+// Roles that require no team assignment
+const NO_TEAM_ROLES = ['business_head', 'dept_admin', 'sub_dept_admin', 'mis'];
+
 // Create a new user
 export const createUser = async (req, res) => {
     console.log('Received user creation request:', req.body);
@@ -12,17 +19,29 @@ export const createUser = async (req, res) => {
         username,
         email,
         team_id,
-        role_type, // 'user' or 'team_leader'
-        permissions
+        role_type,          // 'user', 'team_leader', 'admin', 'mis'
+        permissions,
+        department_ids,     // array of dept IDs (required when role_type === 'admin')
+        sub_department_id,  // optional sub-dept ID for admin role
+        phone_no,
+        address,
+        requires_delete_approval = false  // NEW: triggers approval workflow when this user is deleted
     } = req.body;
 
     // Get company_id from authenticated user (NOT from request body)
     const company_id = req.user.company_id;
 
-    // Only Business Head or Super Admin can create users
-    if (!['super_admin', 'business_head'].includes(req.user.role)) {
+    // Only IT Admin (business_head), Dept Admin, or Super Admin can create users
+    if (!['super_admin', 'business_head', 'dept_admin'].includes(req.user.role)) {
         return res.status(403).json({
-            error: 'Only Business Head or Super Admin can create users'
+            error: 'Only IT Admin or Dept Admin can create users'
+        });
+    }
+
+    // Dept Admin can only create user/team_leader/mis (not another admin of higher/equal level)
+    if (['dept_admin'].includes(req.user.role) && ['dept_admin', 'business_head'].includes(role_type)) {
+        return res.status(403).json({
+            error: 'Dept Admin cannot create another admin of equal or higher level. Only IT Admin can create admins.'
         });
     }
 
@@ -35,20 +54,26 @@ export const createUser = async (req, res) => {
         });
     }
 
+    // Admin role requires at least one department
+    if (['dept_admin', 'sub_dept_admin'].includes(role_type) && (!department_ids || department_ids.length === 0)) {
+        return res.status(400).json({
+            error: 'At least one department must be assigned when creating an admin user'
+        });
+    }
+
     // Validate team_id based on role_type
-    if (!['business_head', 'mis'].includes(role_type) && !team_id) {
-        console.log('Team ID required for non-business_head/mis roles');
+    if (!NO_TEAM_ROLES.includes(role_type) && !team_id) {
+        console.log('Team ID required for non-admin/mis roles');
         return res.status(400).json({
             error: 'Team ID is required for user and team_leader roles',
             received: { role_type, team_id }
         });
     }
 
-    // For business_head and mis, team_id should be null
-    if (['business_head', 'mis'].includes(role_type) && team_id) {
-        console.log('Team ID should not be provided for business_head/mis role');
+    // For no-team roles, team_id should be null
+    if (NO_TEAM_ROLES.includes(role_type) && team_id) {
         return res.status(400).json({
-            error: 'Business head and MIS roles should not be assigned to any team',
+            error: 'Admin and MIS roles should not be assigned to any team',
             received: { role_type, team_id }
         });
     }
@@ -60,8 +85,8 @@ export const createUser = async (req, res) => {
     }
 
     // Validate role type
-    if (!['user', 'team_leader', 'business_head', 'mis'].includes(role_type)) {
-        return res.status(400).json({ error: 'Invalid role type. Must be either "user", "team_leader", "business_head", or "mis"' });
+    if (!['user', 'team_leader', 'admin', 'dept_admin', 'sub_dept_admin', 'mis', 'business_head'].includes(role_type)) {
+        return res.status(400).json({ error: 'Invalid role type.' });
     }
 
     try {
@@ -71,18 +96,36 @@ export const createUser = async (req, res) => {
         try {
             await conn.beginTransaction();
 
-            // CRITICAL: Check license limit before creating user
+            // CRITICAL: Check split license limits before creating user
             if (company_id) { // Skip for super_admin
                 const [license] = await conn.query(
-                    'SELECT available_licenses FROM company_licenses WHERE company_id = ?',
+                    'SELECT total_admin_licenses, used_admin_licenses, total_user_licenses, used_user_licenses FROM company_licenses WHERE company_id = ?',
                     [company_id]
                 );
 
-                if (license.length === 0 || license[0].available_licenses <= 0) {
+                if (license.length === 0) {
                     await conn.rollback();
-                    return res.status(403).json({
-                        error: 'License limit reached. Please contact administrator to upgrade.'
-                    });
+                    return res.status(403).json({ error: 'License record not found for company' });
+                }
+
+                const lic = license[0];
+
+                if (ADMIN_ROLES.includes(role_type)) {
+                    // Check admin slot availability
+                    if (lic.total_admin_licenses > 0 && lic.used_admin_licenses >= lic.total_admin_licenses) {
+                        await conn.rollback();
+                        return res.status(403).json({
+                            error: `Admin license limit reached (${lic.used_admin_licenses}/${lic.total_admin_licenses}). Contact Super Admin to increase admin limit.`
+                        });
+                    }
+                } else if (USER_ROLES.includes(role_type)) {
+                    // Check user slot availability
+                    if (lic.total_user_licenses > 0 && lic.used_user_licenses >= lic.total_user_licenses) {
+                        await conn.rollback();
+                        return res.status(403).json({
+                            error: `User license limit reached (${lic.used_user_licenses}/${lic.total_user_licenses}). Contact Super Admin to increase user limit.`
+                        });
+                    }
                 }
             }
 
@@ -125,18 +168,28 @@ export const createUser = async (req, res) => {
 
             // Create user with company_id
             const [userResult] = await conn.query(
-                'INSERT INTO users (company_id, username, email, password, team_id, role_id) VALUES (?, ?, ?, ?, ?, ?)',
-                [company_id, username, email, hashedPassword, ['business_head', 'mis'].includes(role_type) ? null : team_id, roleResult[0].id]
+                'INSERT INTO users (company_id, username, email, password, team_id, role_id, phone_no, address, requires_delete_approval) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [company_id, username, email, hashedPassword, NO_TEAM_ROLES.includes(role_type) ? null : team_id, roleResult[0].id, phone_no || null, address || null, requires_delete_approval ? 1 : 0]
             );
+
+            const newUserId = userResult.insertId;
 
             // License count will be automatically updated by trigger
 
+            // If admin role, assign to department(s)
+            if (['dept_admin', 'sub_dept_admin'].includes(role_type) && department_ids && department_ids.length > 0) {
+                for (const deptId of department_ids) {
+                    await conn.query(
+                        'INSERT IGNORE INTO admin_departments (user_id, department_id, sub_department_id) VALUES (?, ?, ?)',
+                        [newUserId, deptId, sub_department_id || null]
+                    );
+                }
+            }
+
             // Handle permissions
             if (permissions) {
-                const userId = userResult.insertId;
-
                 // First delete any existing permissions for this user
-                await conn.query('DELETE FROM user_permissions WHERE user_id = ?', [userId]);
+                await conn.query('DELETE FROM user_permissions WHERE user_id = ?', [newUserId]);
 
                 // Get all permission IDs
                 const [permissionRows] = await conn.query('SELECT id, permission_name FROM permissions');
@@ -147,7 +200,7 @@ export const createUser = async (req, res) => {
                     if (permission) {
                         await conn.query(
                             'INSERT INTO user_permissions (user_id, permission_id, value) VALUES (?, ?, ?)',
-                            [userId, permission.id, value ? 1 : 0]
+                            [newUserId, permission.id, value ? 1 : 0]
                         );
                     }
                 }
@@ -165,14 +218,14 @@ export const createUser = async (req, res) => {
             const mailOptions = {
                 from: process.env.EMAIL_USER,
                 to: email,
-                subject: 'Welcome to Digital Flow',
+                subject: 'Welcome to Multycomm',
                 html: `
                     <h2>Welcome ${username}!</h2>
                     <p>Your account has been created successfully.</p>
                     <p>You can now login to your account using your email and the default password: <strong>12345678</strong></p>
                     <p>Please change your password after your first login.</p>
                     <a href="${process.env.FRONTEND_URL}/login" style="display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">Login Now</a>
-                    <p>Best regards,<br>Digital Flow Team</p>
+                    <p>Best regards,<br>Multycomm Team</p>
                 `
             };
 
@@ -181,7 +234,7 @@ export const createUser = async (req, res) => {
 
             res.status(201).json({
                 message: 'User created successfully. Welcome email has been sent.',
-                user_id: userResult.insertId
+                user_id: newUserId
             });
 
         } catch (error) {
@@ -204,39 +257,90 @@ export const getAllUsers = async (req, res) => {
     try {
         connection = await pool.getConnection();
 
+        const { company_id, role_type } = req.query;
+
         // Base query to get user information
         let query = `
-            SELECT u.id, u.username, u.email, u.company_id, u.team_id, t.team_name,
+            SELECT u.id, u.username, u.email, u.phone_no, u.address, u.company_id, u.team_id, t.team_name,
                    r.role_name as role, r.id as role_id,
-                   GROUP_CONCAT(DISTINCT p.permission_name) as permissions
+                   u.requires_delete_approval,
+                   GROUP_CONCAT(DISTINCT p.permission_name) as permissions,
+                   GROUP_CONCAT(DISTINCT COALESCE(d.department_name, dt.department_name) SEPARATOR ', ') as department_names,
+                   GROUP_CONCAT(DISTINCT COALESCE(sd.sub_department_name, sdt.sub_department_name) SEPARATOR ', ') as sub_department_name
             FROM users u
             LEFT JOIN teams t ON u.team_id = t.id
+            LEFT JOIN departments dt ON t.department_id = dt.id
+            LEFT JOIN sub_departments sdt ON t.sub_department_id = sdt.id
             LEFT JOIN roles r ON u.role_id = r.id
             LEFT JOIN user_permissions up ON u.id = up.user_id
             LEFT JOIN permissions p ON up.permission_id = p.id AND up.value = true
+            LEFT JOIN admin_departments ad ON u.id = ad.user_id
+            LEFT JOIN departments d ON ad.department_id = d.id
+            LEFT JOIN sub_departments sd ON ad.sub_department_id = sd.id
         `;
 
         const params = [];
+        const conditions = [];
 
-        // CRITICAL: Add company-based filters
+        // Role-based access control & filtering
         if (req.user.role === 'super_admin') {
-            // Super admin can see all users
-            // No additional filter needed
+            // Super admin can see all, or filter by specific company
+            if (company_id) {
+                conditions.push('u.company_id = ?');
+                params.push(company_id);
+            }
         } else if (req.user.role === 'business_head') {
-            // Business head sees only their company users
-            query += ' WHERE u.company_id = ?';
+            conditions.push('u.company_id = ?');
             params.push(req.user.company_id);
+        } else if (req.user.role === 'dept_admin' || req.user.role === 'sub_dept_admin') {
+            conditions.push('u.company_id = ?');
+            params.push(req.user.company_id);
+
+            if (req.user.role === 'dept_admin') {
+                conditions.push(`(
+                    t.department_id IN (SELECT department_id FROM admin_departments WHERE user_id = ?)
+                    OR EXISTS (SELECT 1 FROM admin_departments ad_filter WHERE ad_filter.user_id = u.id AND ad_filter.department_id IN (SELECT department_id FROM admin_departments WHERE user_id = ?))
+                    OR u.id = ?
+                )`);
+                params.push(req.user.id || req.user.userId, req.user.id || req.user.userId, req.user.id || req.user.userId);
+            } else {
+                conditions.push(`(
+                    t.sub_department_id IN (SELECT sub_department_id FROM admin_departments WHERE user_id = ? AND sub_department_id IS NOT NULL)
+                    OR EXISTS (SELECT 1 FROM admin_departments ad_filter WHERE ad_filter.user_id = u.id AND ad_filter.sub_department_id IN (SELECT sub_department_id FROM admin_departments WHERE user_id = ? AND sub_department_id IS NOT NULL))
+                    OR u.id = ?
+                )`);
+                params.push(req.user.id || req.user.userId, req.user.id || req.user.userId, req.user.id || req.user.userId);
+            }
         } else if (req.user.role === 'team_leader') {
             // Team leaders can only see their team members
-            query += ' WHERE u.team_id = ? AND r.role_name = "user"';
+            conditions.push('u.team_id = ?');
             params.push(req.user.team_id);
+            conditions.push('r.role_name = "user"');
         } else {
             // Regular users can't see any other users
             return res.status(403).json({ error: 'Access denied' });
         }
 
+        // Optional Role Filtering (e.g. for "Show Admins" vs "Show Users")
+        if (role_type) {
+            if (role_type === 'admin_view') {
+                // Special flag to show only admin-types
+                conditions.push("r.role_name IN ('business_head', 'admin', 'dept_admin', 'sub_dept_admin')");
+            } else if (role_type === 'user_view') {
+                // Special flag to show only user-types
+                conditions.push("r.role_name IN ('team_leader', 'user', 'mis')");
+            } else {
+                conditions.push('r.role_name = ?');
+                params.push(role_type);
+            }
+        }
+
+        if (conditions.length > 0) {
+            query += ' WHERE ' + conditions.join(' AND ');
+        }
+
         // Group by and order
-        query += ' GROUP BY u.id ORDER BY u.created_at DESC';
+        query += ' GROUP BY u.id, u.username, u.email, u.phone_no, u.address, u.company_id, u.team_id, t.team_name, r.role_name, r.id, u.requires_delete_approval ORDER BY u.created_at DESC';
 
         // Execute query
         const [users] = await connection.query(query, params);
@@ -321,7 +425,10 @@ export const updateUser = async (req, res) => {
         email,
         team_id,
         role_type,
-        permissions
+        permissions,
+        phone_no,
+        address,
+        requires_delete_approval  // NEW: optional, keeps existing value if undefined
     } = req.body;
 
     // Only Business Head or Super Admin can update users
@@ -346,7 +453,7 @@ export const updateUser = async (req, res) => {
     }
 
     // Validate role type
-    if (!['user', 'team_leader', 'business_head', 'mis'].includes(role_type)) {
+    if (!['user', 'team_leader', 'business_head', 'mis', 'dept_admin', 'sub_dept_admin'].includes(role_type)) {
         return res.status(400).json({ error: 'Invalid role type' });
     }
 
@@ -413,11 +520,19 @@ export const updateUser = async (req, res) => {
                 return res.status(400).json({ error: 'Invalid role type' });
             }
 
-            // Update user
-            await conn.query(
-                'UPDATE users SET username = ?, email = ?, team_id = ?, role_id = ? WHERE id = ?',
-                [username, email, ['business_head', 'mis'].includes(role_type) ? null : team_id, roleResult[0].id, userId]
-            );
+            // Update user (only change requires_delete_approval if explicitly sent)
+            const approvalFlag = requires_delete_approval !== undefined ? (requires_delete_approval ? 1 : 0) : null;
+            if (approvalFlag !== null) {
+                await conn.query(
+                    'UPDATE users SET username = ?, email = ?, team_id = ?, role_id = ?, phone_no = ?, address = ?, requires_delete_approval = ? WHERE id = ?',
+                    [username, email, NO_TEAM_ROLES.includes(role_type) ? null : team_id, roleResult[0].id, phone_no || null, address || null, approvalFlag, userId]
+                );
+            } else {
+                await conn.query(
+                    'UPDATE users SET username = ?, email = ?, team_id = ?, role_id = ?, phone_no = ?, address = ? WHERE id = ?',
+                    [username, email, NO_TEAM_ROLES.includes(role_type) ? null : team_id, roleResult[0].id, phone_no || null, address || null, userId]
+                );
+            }
 
             // Update permissions if provided
             if (permissions) {
@@ -473,11 +588,11 @@ export const deleteUser = async (req, res) => {
 
     const { userId } = req.params;
 
-    // Only Business Head or Super Admin can delete users
+    // Only Business Head and Super Admin can delete users
     if (!['super_admin', 'business_head'].includes(req.user.role)) {
         console.log('Access denied - user role:', req.user.role);
         return res.status(403).json({
-            error: 'Only Business Head or Super Admin can delete users'
+            error: 'You do not have permission to delete users'
         });
     }
 

@@ -24,7 +24,7 @@ export const searchCustomers = async (req, res) => {
       'c.first_name', 'c.last_name', 'c.company_name', 'c.phone_no',
       'c.email_id', 'c.address', 'c.lead_source', 'c.call_status',
       'c.call_outcome', 'c.product', 'c.budget', 'c.decision_making',
-      'c.decision_time', 'c.lead_stage', 'c.assigned_agent', 'c.priority_level',
+      'c.decision_time', 'c.lead_stage', 'c.agent_name', 'c.priority_level',
       'c.customer_category', 'c.tags_labels', 'c.communcation_channel', 'c.deal_value',
       'c.conversion_status', 'c.customer_history', 'c.agent_name', 'c.C_unique_id',
       'c.comment', 'c.last_updated', 'c.id'
@@ -47,22 +47,76 @@ export const searchCustomers = async (req, res) => {
         WHERE c.company_id = ? AND (${searchConditions})
       `;
       params = [req.user.company_id, ...searchFields.map(() => searchParam)];
-    } else if (userRole === 'team_leader') {
-      // Team leaders search their team's customers within their company
-      sql = `
-        SELECT DISTINCT c.* 
-        FROM customers c
-        INNER JOIN users u ON c.agent_name = u.username
-        WHERE u.team_id = ? AND c.company_id = ? AND (${searchConditions})
-      `;
-      params = [req.user.team_id, req.user.company_id, ...searchFields.map(() => searchParam)];
-    } else if (userRole === 'user') {
-      // Regular users search only their assigned customers within their company
+    } else if (userRole === 'dept_admin' || userRole === 'sub_dept_admin' || userRole === 'admin') {
+      // Dept Admin / Sub-Dept Admin can search within their assigned departments/sub-departments
+      const [adminDepts] = await connection.query(
+        `SELECT DISTINCT department_id, sub_department_id FROM admin_departments WHERE user_id = ?`,
+        [req.user.userId]
+      );
+
+      if (adminDepts.length === 0) {
+        return res.json({ success: true, data: [], count: 0 });
+      }
+
+      const assignedDeptIds = [...new Set(adminDepts.map(d => d.department_id))];
+      const assignedSubDeptIds = adminDepts.map(d => d.sub_department_id).filter(id => id !== null);
+
+      let scopeWhere = '';
+      let scopeParams = [];
+
+      if (userRole === 'sub_dept_admin') {
+        if (assignedSubDeptIds.length > 0) {
+          const placeholders = assignedSubDeptIds.map(() => '?').join(',');
+          scopeWhere = `c.sub_department_id IN (${placeholders})`;
+          scopeParams = [...assignedSubDeptIds];
+        } else {
+          return res.json({ success: true, data: [], count: 0 });
+        }
+      } else {
+        const placeholders = assignedDeptIds.map(() => '?').join(',');
+        scopeWhere = `c.department_id IN (${placeholders})`;
+        scopeParams = [...assignedDeptIds];
+      }
+
       sql = `
         SELECT c.* FROM customers c
-        WHERE c.agent_name = ? AND c.company_id = ? AND (${searchConditions})
+        WHERE c.company_id = ? AND (${scopeWhere}) AND (${searchConditions})
       `;
-      params = [req.user.username, req.user.company_id, ...searchFields.map(() => searchParam)];
+      params = [req.user.company_id, ...scopeParams, ...searchFields.map(() => searchParam)];
+    } else if (userRole === 'team_leader' || userRole === 'user') {
+      // Team Leader / User search within their permitted scope
+      const [permissions] = await connection.query(
+        `SELECT p.permission_name FROM permissions p 
+         JOIN user_permissions up ON p.id = up.permission_id 
+         WHERE up.user_id = ? AND up.value = true`,
+        [req.user.userId]
+      );
+      const userPermissions = permissions.map(p => p.permission_name);
+
+      let scopeWhere = '';
+      let scopeParams = [];
+
+      if (userPermissions.includes('view_customer')) {
+        // Full company access
+        scopeWhere = 'c.company_id = ?';
+        scopeParams = [req.user.company_id];
+      } else if (userPermissions.includes('view_team_customers')) {
+        // Team access
+        scopeWhere = 'c.team_id = ? AND c.company_id = ?';
+        scopeParams = [req.user.team_id, req.user.company_id];
+      } else if (userPermissions.includes('view_assigned_customers')) {
+        // Assigned only access
+        scopeWhere = '(c.agent_name = ? OR c.assigned_to = ?) AND c.company_id = ?';
+        scopeParams = [req.user.username, req.user.userId, req.user.company_id];
+      } else {
+        return res.json({ success: true, data: [], count: 0 });
+      }
+
+      sql = `
+        SELECT c.* FROM customers c
+        WHERE ${scopeWhere} AND (${searchConditions})
+      `;
+      params = [...scopeParams, ...searchFields.map(() => searchParam)];
     } else {
       return res.status(403).json({ message: 'Unauthorized role' });
     }
@@ -120,47 +174,83 @@ export const getAllCustomers = async (req, res) => {
 
     // Build query based on user role and permissions
     if (userRole === 'super_admin') {
-      // Super admin sees ALL customers from ALL companies
-      sql = 'SELECT * FROM customers ORDER BY last_updated DESC';
+      // Super admin can see ALL or filter by company/dept/sub-dept
+      const { company_id, department_id, sub_department_id } = req.query;
+      let where = 'WHERE 1=1';
       params = [];
+      if (company_id) { where += ' AND company_id = ?'; params.push(company_id); }
+      if (department_id) { where += ' AND department_id = ?'; params.push(department_id); }
+      if (sub_department_id) { where += ' AND sub_department_id = ?'; params.push(sub_department_id); }
+
+      sql = `SELECT * FROM customers ${where} ORDER BY last_updated DESC`;
     } else if (userRole === 'business_head') {
       // Business Head sees ALL customers from THEIR company only
-      sql = `
-        SELECT * FROM customers 
-        WHERE company_id = ?
-        ORDER BY last_updated DESC
-      `;
+      const { department_id, sub_department_id } = req.query;
+      let where = 'WHERE company_id = ?';
       params = [req.user.company_id];
-    } else if (userRole === 'team_leader' && userPermissions.includes('view_team_customers')) {
-      // Team leaders see their team's customers within their company
-      sql = `
-        SELECT c.* FROM customers c
-        JOIN users u ON (c.agent_name = u.username)
-        WHERE u.team_id = ? AND c.company_id = ?
-        ORDER BY c.last_updated DESC, c.id DESC
-      `;
+      if (department_id) { where += ' AND department_id = ?'; params.push(department_id); }
+      if (sub_department_id) { where += ' AND sub_department_id = ?'; params.push(sub_department_id); }
+      sql = `SELECT * FROM customers ${where} ORDER BY last_updated DESC`;
+    } else if (userRole === 'dept_admin' || userRole === 'sub_dept_admin' || userRole === 'admin') {
+      // Dept Admin / Sub-Dept Admin sees customers in their assigned departments only
+      const { department_id, sub_department_id: requestedSubDeptId } = req.query;
+
+      const [adminDepts] = await connection.query(
+        `SELECT DISTINCT department_id, sub_department_id FROM admin_departments WHERE user_id = ?`,
+        [req.user.userId]
+      );
+
+      if (adminDepts.length === 0) {
+        return res.json({ success: true, data: [], count: 0, role: userRole, permissions: userPermissions });
+      }
+
+      const assignedDeptIds = [...new Set(adminDepts.map(d => d.department_id))];
+      const assignedSubDeptIds = adminDepts.map(d => d.sub_department_id).filter(id => id !== null);
+
+      let where = `WHERE company_id = ?`;
+      params = [req.user.company_id];
+
+      if (userRole === 'sub_dept_admin') {
+        if (assignedSubDeptIds.length > 0) {
+          const placeholders = assignedSubDeptIds.map(() => '?').join(',');
+          where += ` AND sub_department_id IN (${placeholders})`;
+          params.push(...assignedSubDeptIds);
+        } else {
+          return res.json({ success: true, data: [], count: 0 });
+        }
+      } else {
+        const placeholders = assignedDeptIds.map(() => '?').join(',');
+        where += ` AND department_id IN (${placeholders})`;
+        params.push(...assignedDeptIds);
+      }
+
+      if (department_id) { where += ' AND department_id = ?'; params.push(department_id); }
+      if (requestedSubDeptId) { where += ' AND sub_department_id = ?'; params.push(requestedSubDeptId); }
+
+      sql = `SELECT * FROM customers ${where} ORDER BY last_updated DESC`;
+    } else if (userPermissions.includes('view_customer')) {
+      // User has explicit permission to see all company data
+      sql = `SELECT * FROM customers WHERE company_id = ? ORDER BY last_updated DESC`;
+      params = [req.user.company_id];
+    } else if (userPermissions.includes('view_team_customers') && !userPermissions.includes('view_assigned_customers')) {
+      // User can see entire team data ONLY (Strictly Team View)
+      sql = `SELECT * FROM customers WHERE team_id = ? AND company_id = ? ORDER BY last_updated DESC, id DESC`;
       params = [req.user.team_id, req.user.company_id];
-    } else if (userRole === 'user' && userPermissions.includes('view_assigned_customers')) {
-      // Regular users see only their assigned customers within their company
-      sql = `
-        SELECT * FROM customers 
-        WHERE agent_name = ? AND company_id = ?
-        ORDER BY last_updated DESC
-      `;
-      params = [req.user.username, req.user.company_id];
+    } else if (userPermissions.includes('view_assigned_customers')) {
+      // User/TL sees only their assigned leads (Priority View)
+      // Even if they have view_team_customers, if view_assigned_customers is also checked, 
+      // we show their personal view for segregation as per user request.
+      sql = `SELECT * FROM customers WHERE (agent_name = ? OR assigned_to = ?) AND company_id = ? ORDER BY last_updated DESC`;
+      params = [req.user.username, req.user.userId, req.user.company_id];
     } else {
-      // Default case - users with view_customer permission see all customers in their company
-      sql = `
-        SELECT * FROM customers 
-        WHERE company_id = ?
-        ORDER BY last_updated DESC
-      `;
-      params = [req.user.company_id];
+      // Default return empty if no view permissions
+      return res.json({ success: true, data: [], count: 0, message: 'No view permissions' });
     }
 
-    console.log('Executing SQL:', sql, 'with params:', params);
+    console.log('[DEBUG] Final SQL Query:', sql);
+    console.log('[DEBUG] SQL Params:', params);
     const [results] = await connection.query(sql, params);
-    console.log('Query results:', results);
+    console.log('[DEBUG] Query Results Count:', results.length);
 
     res.json({
       success: true,
@@ -462,20 +552,38 @@ export const getTeams = async (req, res) => {
 
     if (req.user.role === 'super_admin' || req.user.role === 'it_admin' || req.user.role === 'business_head') {
       // Super_Admin, IT Admin and Business Head can see all teams
-      query = 'SELECT id, name FROM teams ORDER BY name';
+      query = 'SELECT id, team_name as name FROM teams ORDER BY team_name';
+    } else if (['dept_admin', 'admin'].includes(req.user.role)) {
+      // dept_admin can see teams in assigned departments
+      query = `
+        SELECT DISTINCT t.id, t.team_name as name 
+        FROM teams t
+        JOIN admin_departments ad ON ad.department_id = t.department_id
+        WHERE ad.user_id = ?
+        ORDER BY t.team_name`;
+      params = [req.user.userId];
+    } else if (req.user.role === 'sub_dept_admin') {
+      // sub_dept_admin can see teams in assigned sub-departments
+      query = `
+        SELECT DISTINCT t.id, t.team_name as name 
+        FROM teams t
+        JOIN admin_departments ad ON ad.sub_department_id = t.sub_department_id
+        WHERE ad.user_id = ?
+        ORDER BY t.team_name`;
+      params = [req.user.userId];
     } else if (req.user.role === 'team_leader') {
       // team_leader can only see their team
-      query = 'SELECT id, name FROM teams WHERE id = ?';
+      query = 'SELECT id, team_name as name FROM teams WHERE id = ?';
       params = [req.user.team_id];
     } else {
-      // Regular users can only see their assigned team
+      // Regular users...
       query = `
-        SELECT t.id, t.name 
+        SELECT t.id, t.team_name as name 
         FROM teams t
         INNER JOIN users u ON t.id = u.team_id
-        WHERE u.username = ?
+        WHERE u.id = ?
       `;
-      params = [req.user.username];
+      params = [req.user.userId];
     }
 
     const [rows] = await connection.execute(query, params);
@@ -580,9 +688,9 @@ export const getTeamRecords = async (req, res) => {
 
     // Query records for the specified team leader
     const query = `
-          SELECT first_name, phone_no, email_id, assigned_agent 
+          SELECT first_name, phone_no, email_id, agent_name 
           FROM customers 
-          WHERE assigned_agent = ?
+          WHERE agent_name = ?
           ORDER BY last_updated DESC, id DESC
       `;
 

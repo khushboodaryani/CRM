@@ -26,25 +26,35 @@ export const createCompany = async (req, res) => {
         company_name,
         company_email,
         company_username,
-        license_limit,
+        license_limit,    // kept for backward compat (total)
+        admin_limit,      // new: max admin slots
+        user_limit,       // new: max user slots
         bh_username,
         bh_email
     } = req.body;
 
     // Validation
-    if (!company_name || !company_email || !company_username || !license_limit || !bh_username || !bh_email) {
+    if (!company_name || !company_email || !company_username || !bh_username || !bh_email) {
         return res.status(400).json({
             success: false,
-            message: 'Missing required fields: company_name, company_email, company_username, license_limit, bh_username, bh_email'
+            message: 'Missing required fields: company_name, company_email, company_username, bh_username, bh_email'
         });
     }
 
-    if (license_limit < 1) {
+    // Require either license_limit OR both admin_limit + user_limit
+    const hasLegacyLimit = license_limit && license_limit > 0;
+    const hasSplitLimit = admin_limit >= 0 && user_limit >= 0;
+    if (!hasLegacyLimit && !hasSplitLimit) {
         return res.status(400).json({
             success: false,
-            message: 'License limit must be at least 1'
+            message: 'Provide either license_limit or both admin_limit and user_limit'
         });
     }
+
+    // Compute split values
+    const effectiveAdminLimit = admin_limit !== undefined ? parseInt(admin_limit) : Math.max(1, Math.floor(license_limit * 0.3));
+    const effectiveUserLimit = user_limit !== undefined ? parseInt(user_limit) : Math.max(1, Math.floor(license_limit * 0.7));
+    const effectiveTotal = license_limit || (effectiveAdminLimit + effectiveUserLimit);
 
     let connection;
     try {
@@ -82,17 +92,25 @@ export const createCompany = async (req, res) => {
 
         // Create company
         const [companyResult] = await connection.query(
-            `INSERT INTO companies (company_name, company_email, license_limit, created_by)
-             VALUES (?, ?, ?, ?)`,
-            [company_name, company_email, license_limit, req.user.userId]
+            `INSERT INTO companies (company_name, company_email, license_limit, admin_limit, user_limit, created_by)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [company_name, company_email, effectiveTotal, effectiveAdminLimit, effectiveUserLimit, req.user.userId]
         );
 
         const companyId = companyResult.insertId;
 
-        // Initialize company license
+        // Initialize company license with split tracking
         await connection.query(
-            'INSERT INTO company_licenses (company_id, total_licenses, used_licenses) VALUES (?, ?, 0)',
-            [companyId, license_limit]
+            `INSERT INTO company_licenses
+             (company_id, total_licenses, used_licenses, total_admin_licenses, used_admin_licenses, total_user_licenses, used_user_licenses)
+             VALUES (?, ?, 0, ?, 0, ?, 0)`,
+            [companyId, effectiveTotal, effectiveAdminLimit, effectiveUserLimit]
+        );
+
+        // Also update companies table with split limits
+        await connection.query(
+            'UPDATE companies SET admin_limit = ?, user_limit = ? WHERE id = ?',
+            [effectiveAdminLimit, effectiveUserLimit, companyId]
         );
 
         // Get business_head role ID
@@ -154,12 +172,14 @@ export const createCompany = async (req, res) => {
 
         res.status(201).json({
             success: true,
-            message: 'Company and Business Head created successfully',
+            message: 'Company and IT Admin created successfully',
             data: {
                 company_id: companyId,
                 company_name,
                 bh_username,
-                license_limit
+                admin_limit: effectiveAdminLimit,
+                user_limit: effectiveUserLimit,
+                total_licenses: effectiveTotal
             }
         });
 
@@ -190,16 +210,22 @@ export const getAllCompanies = async (req, res) => {
         connection = await pool.getConnection();
 
         const [companies] = await connection.query(`
-            SELECT 
+            SELECT
                 c.id,
                 c.company_name,
                 c.company_email,
                 c.is_active,
                 c.subscription_start,
                 c.subscription_end,
+                c.admin_limit,
+                c.user_limit,
                 cl.total_licenses,
                 cl.used_licenses,
                 cl.available_licenses,
+                cl.total_admin_licenses,
+                cl.used_admin_licenses,
+                cl.total_user_licenses,
+                cl.used_user_licenses,
                 (SELECT COUNT(*) FROM users WHERE company_id = c.id) as total_users,
                 (SELECT COUNT(*) FROM customers WHERE company_id = c.id) as total_customers,
                 (SELECT username FROM users WHERE company_id = c.id AND is_company_admin = true LIMIT 1) as bh_username,
@@ -292,7 +318,7 @@ export const getCompanyById = async (req, res) => {
  */
 export const updateCompany = async (req, res) => {
     const { id } = req.params;
-    const { company_name, company_email, license_limit, is_active, subscription_start, subscription_end } = req.body;
+    const { company_name, company_email, license_limit, admin_limit, user_limit, is_active, subscription_start, subscription_end } = req.body;
 
     let connection;
     try {
@@ -343,12 +369,34 @@ export const updateCompany = async (req, res) => {
             );
         }
 
-        // Update license if provided
-        if (license_limit !== undefined) {
-            await connection.query(
-                'UPDATE company_licenses SET total_licenses = ? WHERE company_id = ?',
-                [license_limit, id]
-            );
+        if (license_limit !== undefined || admin_limit !== undefined || user_limit !== undefined) {
+            const licUpdates = [];
+            const licValues = [];
+
+            if (license_limit !== undefined) {
+                licUpdates.push('total_licenses = ?');
+                licValues.push(license_limit);
+            }
+            if (admin_limit !== undefined) {
+                licUpdates.push('total_admin_licenses = ?');
+                licValues.push(admin_limit);
+                updates.push('admin_limit = ?');
+                values.push(admin_limit);
+            }
+            if (user_limit !== undefined) {
+                licUpdates.push('total_user_licenses = ?');
+                licValues.push(user_limit);
+                updates.push('user_limit = ?');
+                values.push(user_limit);
+            }
+
+            if (licUpdates.length > 0) {
+                licValues.push(id);
+                await connection.query(
+                    `UPDATE company_licenses SET ${licUpdates.join(', ')} WHERE company_id = ?`,
+                    licValues
+                );
+            }
         }
 
         await connection.commit();
@@ -405,6 +453,88 @@ export const deactivateCompany = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to deactivate company'
+        });
+    } finally {
+        if (connection) {
+            connection.release();
+        }
+    }
+};
+
+/**
+ * Get full company hierarchy (Depts -> Sub-Depts -> Teams)
+ * Only accessible by super_admin
+ */
+export const getCompanyHierarchy = async (req, res) => {
+    let connection;
+    try {
+        const pool = connectDB();
+        connection = await pool.getConnection();
+
+        // Fetch all companies
+        const [companies] = await connection.query('SELECT id, company_name FROM companies WHERE is_active = true');
+
+        const hierarchy = [];
+
+        for (const company of companies) {
+            // Fetch depts
+            const [depts] = await connection.query(
+                'SELECT id, department_name FROM departments WHERE company_id = ? AND is_active = true',
+                [company.id]
+            );
+
+            const companyNode = {
+                ...company,
+                departments: []
+            };
+
+            for (const dept of depts) {
+                // Fetch sub-depts
+                const [subDepts] = await connection.query(
+                    'SELECT id, sub_department_name FROM sub_departments WHERE department_id = ? AND is_active = true',
+                    [dept.id]
+                );
+
+                const deptNode = {
+                    ...dept,
+                    sub_departments: []
+                };
+
+                for (const sd of subDepts) {
+                    // Fetch teams for sub-dept
+                    const [teams] = await connection.query(
+                        'SELECT id, team_name FROM teams WHERE sub_department_id = ?',
+                        [sd.id]
+                    );
+                    deptNode.sub_departments.push({
+                        ...sd,
+                        teams
+                    });
+                }
+
+                // Fetch teams directly under dept (no sub-dept)
+                const [deptTeams] = await connection.query(
+                    'SELECT id, team_name FROM teams WHERE department_id = ? AND (sub_department_id IS NULL OR sub_department_id = 0)',
+                    [dept.id]
+                );
+                deptNode.teams = deptTeams;
+
+                companyNode.departments.push(deptNode);
+            }
+
+            hierarchy.push(companyNode);
+        }
+
+        res.json({
+            success: true,
+            data: hierarchy
+        });
+
+    } catch (error) {
+        logger.error('Error fetching company hierarchy:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch company hierarchy'
         });
     } finally {
         if (connection) {

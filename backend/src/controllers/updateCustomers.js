@@ -223,7 +223,15 @@ export const updateCustomer = async (req, res) => {
       await connection.execute(updateQuery, updateValues);
 
       // Log the changes using the insertChangeLog function
-      await insertChangeLog(connection, customerId, cUniqueId, updateLogs, req.user.username, req.user.company_id);
+      // Fallback to customer's company_id if user's company_id is missing (e.g. Super Admin)
+      await insertChangeLog(
+        connection,
+        customerId,
+        cUniqueId || customer.C_unique_id,
+        updateLogs,
+        req.user.username,
+        req.user.company_id || customer.company_id
+      );
 
       await connection.commit();
 
@@ -262,9 +270,27 @@ export const updateCustomer = async (req, res) => {
 // Function to insert change log entries
 export const insertChangeLog = async (connection, customerId, C_unique_id, changes, username, company_id) => {
   try {
-    // Ensure all required fields are present
-    if (!customerId || !username || !company_id) {
-      throw new Error('Missing required fields for change log');
+    // Ensure critical fields are present
+    if (!customerId || !username) {
+      throw new Error('Customer ID and Username are required for change log');
+    }
+
+    // Fallback company_id if not provided
+    let finalCompanyId = company_id;
+    if (!finalCompanyId) {
+      const [cust] = await connection.execute('SELECT company_id FROM customers WHERE id = ?', [customerId]);
+      finalCompanyId = cust[0]?.company_id;
+    }
+
+    if (!finalCompanyId) {
+      throw new Error('Company ID is required for change log and could not be found');
+    }
+
+    // Fallback C_unique_id if not provided
+    let finalUniqueId = C_unique_id;
+    if (!finalUniqueId) {
+      const [cust] = await connection.execute('SELECT C_unique_id FROM customers WHERE id = ?', [customerId]);
+      finalUniqueId = cust[0]?.C_unique_id || 'N/A';
     }
 
     // Insert each change as a separate record
@@ -279,12 +305,12 @@ export const insertChangeLog = async (connection, customerId, C_unique_id, chang
 
       const params = [
         customerId,
-        C_unique_id || null,
-        change.field || null,
-        change.oldValue || null,
-        change.newValue || null,
+        finalUniqueId,
+        change.field || 'unknown',
+        change.oldValue === undefined || change.oldValue === null ? '' : String(change.oldValue),
+        change.newValue === undefined || change.newValue === null ? '' : String(change.newValue),
         username,
-        company_id
+        finalCompanyId
       ];
 
       console.log('Inserting change log:', {
@@ -322,7 +348,7 @@ export const historyCustomer = async (req, res) => {
 
     // First get the customer to check authorization
     const [customer] = await connection.execute(
-      'SELECT agent_name FROM customers WHERE id = ?',
+      'SELECT company_id, C_unique_id, agent_name, department_id, sub_department_id, team_id FROM customers WHERE id = ?',
       [customerId]
     );
 
@@ -330,22 +356,47 @@ export const historyCustomer = async (req, res) => {
       return res.status(404).json({ message: 'Customer not found' });
     }
 
-    // Check authorization
-    if (req.user.role !== 'super_admin' && req.user.role !== 'business_head' && req.user.role !== 'team_leader' && customer[0].agent_name !== req.user.username) {
+    const customerData = customer[0];
+    const userRole = req.user.role;
+    let isAuthorized = false;
+
+    // Authorization logic
+    if (['super_admin', 'business_head', 'mis'].includes(userRole)) {
+      isAuthorized = true;
+    } else if (userRole === 'dept_admin') {
+      const [assignments] = await connection.execute(
+        'SELECT 1 FROM admin_departments WHERE user_id = ? AND department_id = ?',
+        [req.user.userId, customerData.department_id]
+      );
+      if (assignments.length > 0) isAuthorized = true;
+    } else if (userRole === 'sub_dept_admin') {
+      const [assignments] = await connection.execute(
+        'SELECT 1 FROM admin_departments WHERE user_id = ? AND sub_department_id = ?',
+        [req.user.userId, customerData.sub_department_id]
+      );
+      if (assignments.length > 0) isAuthorized = true;
+    } else if (userRole === 'team_leader') {
+      if (String(customerData.team_id) === String(req.user.team_id)) isAuthorized = true;
+    } else if (customerData.agent_name === req.user.username) {
+      isAuthorized = true;
+    }
+
+    if (!isAuthorized) {
       return res.status(403).json({
         message: 'You are not authorized to log changes for this customer',
         user: req.user,
-        customerAgent: customer[0].agent_name
+        customerAgent: customerData.agent_name
       });
     }
 
-    // Insert the changes
+    // Insert the changes with fallbacks
     await insertChangeLog(
       connection,
       customerId,
-      C_unique_id,
+      C_unique_id || customerData.C_unique_id,
       changes,
-      req.user.username
+      req.user.username,
+      req.user.company_id || customerData.company_id
     );
 
     res.status(200).json({
@@ -387,7 +438,7 @@ export const gethistoryCustomer = async (req, res) => {
 
     // First get the customer to check authorization
     const [customer] = await connection.execute(
-      'SELECT agent_name FROM customers WHERE id = ?',
+      'SELECT company_id, C_unique_id, agent_name, department_id, sub_department_id, team_id FROM customers WHERE id = ?',
       [customerId]
     );
 
@@ -395,12 +446,36 @@ export const gethistoryCustomer = async (req, res) => {
       return res.status(404).json({ message: 'Customer not found' });
     }
 
-    // Check authorization
-    if (req.user.role !== 'super_admin' && req.user.role !== 'business_head' && req.user.role !== 'team_leader' && customer[0].agent_name !== req.user.username) {
+    const customerData = customer[0];
+    const userRole = req.user.role;
+    let isAuthorized = false;
+
+    // Authorization logic
+    if (['super_admin', 'business_head', 'mis'].includes(userRole)) {
+      isAuthorized = true;
+    } else if (userRole === 'dept_admin') {
+      const [assignments] = await connection.execute(
+        'SELECT 1 FROM admin_departments WHERE user_id = ? AND department_id = ?',
+        [req.user.userId, customerData.department_id]
+      );
+      if (assignments.length > 0) isAuthorized = true;
+    } else if (userRole === 'sub_dept_admin') {
+      const [assignments] = await connection.execute(
+        'SELECT 1 FROM admin_departments WHERE user_id = ? AND sub_department_id = ?',
+        [req.user.userId, customerData.sub_department_id]
+      );
+      if (assignments.length > 0) isAuthorized = true;
+    } else if (userRole === 'team_leader') {
+      if (String(customerData.team_id) === String(req.user.team_id)) isAuthorized = true;
+    } else if (customerData.agent_name === req.user.username) {
+      isAuthorized = true;
+    }
+
+    if (!isAuthorized) {
       return res.status(403).json({
         message: 'You are not authorized to view this customer\'s history',
         user: req.user,
-        customerAgent: customer[0].agent_name
+        customerAgent: customerData.agent_name
       });
     }
 

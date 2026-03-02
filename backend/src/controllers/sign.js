@@ -95,8 +95,8 @@ export const registerCustomer = async (req, res) => {
                 } else if (role_type === 'team_leader') {
                     // Team leaders get view_team_customers by default
                     hasPermission = permission.permission_name === 'view_team_customers' || permission.permission_name === 'view_assigned_customers';
-                } else if (role_type === 'business_head') {
-                    // Business heads get all permissions
+                } else if (role_type === 'business_head' || role_type === 'dept_admin' || role_type === 'sub_dept_admin') {
+                    // Business heads and specific admins get all permissions
                     hasPermission = true;
                 }
 
@@ -150,16 +150,50 @@ export const getTeams = async (req, res) => {
         const pool = await connectDB();
         connection = await pool.getConnection();
 
-        let query = 'SELECT id, team_name FROM teams';
+        let query = 'SELECT id, team_name, department_id, company_id FROM teams';
         let params = [];
+        let whereClauses = [];
 
-        // Filter by company_id for non-super_admin users
-        if (req.user.role !== 'super_admin') {
-            query += ' WHERE company_id = ?';
+        if (req.user.role === 'super_admin') {
+            if (req.query.company_id) {
+                whereClauses.push('company_id = ?');
+                params.push(req.query.company_id);
+            }
+        } else if (req.user.role === 'business_head') {
+            whereClauses.push('company_id = ?');
             params.push(req.user.company_id);
+        } else if (['dept_admin', 'admin', 'sub_dept_admin'].includes(req.user.role)) {
+            whereClauses.push('company_id = ?');
+            params.push(req.user.company_id);
+
+            if (req.user.role === 'sub_dept_admin') {
+                whereClauses.push('sub_department_id IN (SELECT sub_department_id FROM admin_departments WHERE user_id = ?)');
+            } else {
+                whereClauses.push('department_id IN (SELECT department_id FROM admin_departments WHERE user_id = ?)');
+            }
+            params.push(req.user.userId);
+        } else {
+            whereClauses.push('company_id = ?');
+            params.push(req.user.company_id);
+            whereClauses.push('id = ?');
+            params.push(req.user.team_id || 0);
         }
 
-        query += ' ORDER BY team_name'; // Ensure ordering is applied after WHERE clause
+        if (req.query.department_id) {
+            whereClauses.push('department_id = ?');
+            params.push(req.query.department_id);
+        }
+
+        if (req.query.sub_department_id) {
+            whereClauses.push('sub_department_id = ?');
+            params.push(req.query.sub_department_id);
+        }
+
+        if (whereClauses.length > 0) {
+            query += ' WHERE ' + whereClauses.join(' AND ');
+        }
+
+        query += ' ORDER BY team_name';
 
         const [teams] = await connection.query(query, params);
 
@@ -407,7 +441,7 @@ export const fetchCurrentUser = async (req, res) => {
         // Retrieve the user's information based on their ID
         const [users] = await connection.query(`
             SELECT u.id, u.username, u.email, r.role_name as role, u.team_id, t.team_name,
-                   u.role_id, GROUP_CONCAT(p.permission_name) as permissions
+                   u.role_id, u.requires_delete_approval, GROUP_CONCAT(p.permission_name) as permissions
             FROM users u
             LEFT JOIN teams t ON u.team_id = t.id
             LEFT JOIN roles r ON u.role_id = r.id
@@ -433,7 +467,8 @@ export const fetchCurrentUser = async (req, res) => {
             role: user.role,
             team_id: user.team_id ? parseInt(user.team_id) : null,
             team_name: user.team_name,
-            permissions: permissions
+            permissions: permissions,
+            requires_delete_approval: user.requires_delete_approval === 1 || user.requires_delete_approval === true
         });
     } catch (error) {
         console.error('Error fetching current user:', error);

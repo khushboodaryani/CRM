@@ -1,9 +1,20 @@
 -- ============================================================================
--- SUPER ADMIN SETUP - RUN AFTER SCHEMA IS CREATED
+-- MULTYCOMM CRM — SUPER ADMIN SETUP
 -- ============================================================================
--- This creates the super admin user with all permissions
--- Email: superadmin@crm.com
--- Password: 12345678
+-- Run this AFTER schema_multitenant.sql and all migration scripts in src/db/
+--
+-- FULL RUN ORDER (fresh install):
+--   1. src/db/schema_multitenant.sql            ← creates all tables
+--   2. src/db/migration_to_multitenant.sql       ← migrates legacy data (skip on fresh DB)
+--   3. src/db/lead_distribution_migration.sql    ← adds distribution_rules table
+--   4. src/db/role_separation_migration.sql      ← adds dept_admin / sub_dept_admin roles
+--   5. src/db/v17b_lead_delete_migration.sql     ← adds delete_approval_requests + notifications
+--   6. src/db/add_user_fields.sql                ← adds phone_no / address to users
+--   7. THIS FILE  ← creates super admin user with all permissions
+--
+-- Credentials:
+--   Email:    superadmin@crm.com
+--   Password: 12345678
 -- ============================================================================
 
 USE knowledgeBase_multitenant;

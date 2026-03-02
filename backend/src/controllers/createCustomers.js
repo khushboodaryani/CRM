@@ -205,7 +205,6 @@ export const makeNewRecord = async (req, res) => {
             decision_time: validateEnum(decision_time, VALID_DECISION_TIME, null),
             lead_stage: validateEnum(lead_stage, VALID_LEAD_STAGE, null),
             next_follow_up: formatMySQLDateTime(next_follow_up),
-            assigned_agent: validateVarchar(assigned_agent, 100),
             reminder_notes: comment, // Using comment as reminder_notes
             priority_level: validateEnum(priority_level, VALID_PRIORITY_LEVEL, null),
             customer_category: validateEnum(customer_category, VALID_CUSTOMER_CATEGORY, null),
