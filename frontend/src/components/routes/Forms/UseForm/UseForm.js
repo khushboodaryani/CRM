@@ -12,14 +12,17 @@ const UseForm = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const { phone_no } = useParams();
-    const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [hasDeletePermission, setHasDeletePermission] = useState(false);
-    const [error, setError] = useState(null);
+    const [requiresDeleteApproval, setRequiresDeleteApproval] = useState(false);
     const [customer, setCustomer] = useState(null);
-    const [availableAgents, setAvailableAgents] = useState([]);
     const [editingInfo, setEditingInfo] = useState(false);
-    const alertShownRef = useRef(false); // Use a ref to track if the alert has been shown
+    const [saveSuccess, setSaveSuccess] = useState(false);
+    const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
+    const alertShownRef = useRef(false);
+
+    // Check if we are in read-only mode (passed from View button in admin portals)
+    const readOnly = location.state?.readOnly === true;
 
     const [formData, setFormData] = useState({
         first_name: '',
@@ -27,8 +30,6 @@ const UseForm = () => {
         agent_name: ''
     });
     const [customFields, setCustomFields] = useState([]);
-
-    const [updatedData, setUpdatedData] = useState(formData);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -44,27 +45,8 @@ const UseForm = () => {
         }
 
         setFormData(prev => ({ ...prev, [name]: processedValue }));
-        setUpdatedData(prev => ({ ...prev, [name]: processedValue }));
     };
 
-    const validateRequiredFields = () => {
-        const mandatoryFields = ['first_name', 'phone_no', 'agent_name'];
-        const allRequiredFields = [
-            ...mandatoryFields,
-            ...customFields.filter(f => f.IS_NULLABLE === 'NO').map(f => f.COLUMN_NAME)
-        ];
-
-        const missingFields = allRequiredFields.filter(field => {
-            const value = formData[field];
-            return !value || (typeof value === 'string' && !value.trim());
-        });
-
-        if (missingFields.length > 0) {
-            setError(`Please fill in all required fields: ${missingFields.join(', ')}`);
-            return false;
-        }
-        return true;
-    };
 
     const formatDateForInput = (dateString) => {
         if (!dateString) return '';
@@ -128,34 +110,18 @@ const UseForm = () => {
                 }
             });
 
-            setUser(userResponse.data);
-
-            // Get permissions from API response
-            const permissions = userResponse.data.permissions || [];
-            console.log('Latest user permissions from API:', permissions);
+            const userData = userResponse.data;
 
             // Check for delete permission
+            const permissions = userData.permissions || [];
             const hasDeletePerm = Array.isArray(permissions) && permissions.includes('delete_customer');
-            console.log('Has delete permission:', hasDeletePerm);
             setHasDeletePermission(hasDeletePerm);
 
-            // Then get the available agents based on user's role
-            try {
-                const agentsResponse = await axios.get(`${apiUrl}/players/teams`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                setAvailableAgents(agentsResponse.data);
-            } catch (error) {
-                console.error('Error fetching available agents:', error);
-                setError('Failed to fetch available agents');
-            }
+            // Store requires_delete_approval flag so handleDelete can act on it proactively
+            setRequiresDeleteApproval(userData.requires_delete_approval === true);
 
-        } catch (error) {
-            console.error('Error in fetchUser:', error);
-            setError('Failed to fetch user data');
+        } catch (fetchErr) {
+            console.error('Error in fetchUser:', fetchErr);
             setLoading(false);
         }
     };
@@ -174,7 +140,8 @@ const UseForm = () => {
                 if (response.data.success) {
                     const systemFields = [
                         'id', 'created_at', 'updated_at', 'last_updated',
-                        'company_id', 'team_id', 'duplicate_action', 'C_unique_id', 'date_created'
+                        'company_id', 'team_id', 'duplicate_action', 'C_unique_id', 'date_created',
+                        'department_id', 'sub_department_id', 'assigned_to'
                     ];
                     const mandatoryFields = ['first_name', 'phone_no', 'agent_name'];
 
@@ -259,6 +226,7 @@ const UseForm = () => {
         };
 
         fetchCustomerData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [phone_no]); // Add phone_no as dependency since it's used in fetchCustomerData
 
     useEffect(() => {
@@ -284,73 +252,59 @@ const UseForm = () => {
             return;
         }
         const confirmDelete = window.confirm("Are you sure you want to delete this customer?");
+        console.log('[DEBUG] Single delete confirmed for ID:', customer.id);
         if (!confirmDelete) return;
 
-        try {
-            const token = localStorage.getItem('token');
-            const apiUrl = process.env.REACT_APP_API_URL;
+        const token = localStorage.getItem('token');
+        const apiUrl = process.env.REACT_APP_API_URL;
 
-            await axios.delete(`${apiUrl}/customers/${customer.id}`, {
+        try {
+            // ── Proactive approval check: if we already know this user needs approval,
+            //    skip the DELETE call entirely and go straight to the request endpoint.
+            if (requiresDeleteApproval) {
+                await axios.post(
+                    `${apiUrl}/customers/${customer.id}/request-delete`,
+                    {},
+                    { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+                );
+                const name = customer.first_name
+                    ? `${customer.first_name} ${customer.last_name || ''}`.trim()
+                    : `#${customer.id}`;
+                alert(`Approval request sent for deleting "${name}". You will be notified once reviewed.`);
+                return; // Customer stays — don't navigate away
+            }
+
+            // ── Normal delete (no approval required) ─────────────────────────────
+            const response = await axios.delete(`${apiUrl}/customers/${customer.id}`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json",
+                    'Content-Type': 'application/json',
                 },
             });
 
-            alert("Customer deleted successfully.");
-            navigate("/customers");
+            // Backend safety-net: 202 = approval required (stale state edge-case)
+            if (response.status === 202 && response.data?.requires_approval) {
+                await axios.post(
+                    `${apiUrl}/customers/${customer.id}/request-delete`,
+                    {},
+                    { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+                );
+                alert(`Approval request sent for deleting "${response.data.customerName}". You will be notified once reviewed.`);
+                return;
+            }
+
+            alert('Customer deleted successfully.');
+            navigate('/customers');
         } catch (error) {
-            if (error.response && error.response.status === 403) {
-                alert("You do not have permission to delete customers.");
-                // Refresh user data to get latest permissions
-                const fetchUser = async () => {
-                    try {
-                        const token = localStorage.getItem('token');
-                        const apiUrl = process.env.REACT_APP_API_URL;
-
-                        // First get the current user's data
-                        const userResponse = await axios.get(`${apiUrl}/current-user`, {
-                            headers: {
-                                Authorization: `Bearer ${token}`,
-                                'Content-Type': 'application/json'
-                            }
-                        });
-
-                        setUser(userResponse.data);
-
-                        // Get permissions from API response only
-                        const permissions = userResponse.data.permissions || [];
-                        console.log('Latest user permissions from API:', permissions);
-
-                        // Check if delete_customer permission exists in the array
-                        const hasDeletePerm = Array.isArray(permissions) && permissions.includes('delete_customer');
-                        console.log('Has delete permission:', hasDeletePerm);
-                        setHasDeletePermission(hasDeletePerm);
-
-                        // Then get the available agents based on user's role
-                        try {
-                            const agentsResponse = await axios.get(`${apiUrl}/players/teams`, {
-                                headers: {
-                                    Authorization: `Bearer ${token}`,
-                                    'Content-Type': 'application/json'
-                                }
-                            });
-                            setAvailableAgents(agentsResponse.data);
-                        } catch (error) {
-                            console.error('Error fetching available agents:', error);
-                            setError('Failed to fetch available agents');
-                        }
-
-                    } catch (error) {
-                        console.error('Error in fetchUser:', error);
-                        setError('Failed to fetch user data');
-                        setLoading(false);
-                    }
-                };
-                await fetchUser();
+            if (error.response?.status === 409) {
+                // Duplicate pending request — treat as success
+                alert('A delete approval request is already pending for this record.');
+            } else if (error.response?.status === 403) {
+                alert('You do not have permission to delete customers.');
+                await fetchUser(); // Refresh permissions
             } else {
-                console.error("Error deleting customer:", error);
-                alert("Failed to delete customer. Please try again.");
+                console.error('Error deleting customer:', error);
+                alert('Failed to delete customer. Please try again.');
             }
         }
     };
@@ -416,7 +370,7 @@ const UseForm = () => {
             const apiUrl = process.env.REACT_APP_API_URL;
 
             // Update customer data - only send changed fields
-            const response = await axios.put(
+            await axios.put(
                 `${apiUrl}/customers/${customer.id}`,
                 changedFields,
                 {
@@ -427,9 +381,20 @@ const UseForm = () => {
                 }
             );
 
-            setCustomer(formData);
-            setFormData(formData);
-            navigate("/customers");
+            // Re-fetch the updated customer to refresh data and history
+            const refreshed = await axios.get(`${apiUrl}/customers/phone/${formData.phone_no || phone_no}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const updatedCustomer = refreshed.data?.customer || formData;
+            setCustomer(updatedCustomer);
+            setFormData(updatedCustomer);
+
+            // Increment refresh key to trigger LastChanges re-fetch
+            setHistoryRefreshKey(prev => prev + 1);
+
+            // Show brief inline success
+            setSaveSuccess(true);
+            setTimeout(() => setSaveSuccess(false), 4000);
         } catch (error) {
             console.error('Update error:', error);
             console.error('Error response:', error.response?.data);
@@ -446,8 +411,83 @@ const UseForm = () => {
         }
     };
 
-    if (loading) return <div>Loading customer data...</div>;
-    if (!customer) return <div>No customer data found.</div>;
+    if (loading) return <div className="uf-loading">Loading customer data...</div>;
+    if (!customer) return <div className="uf-loading">No customer data found.</div>;
+
+    /* ── Read-Only View Mode ──────────────────────────────────────────── */
+    if (readOnly) {
+        return (
+            <div>
+                <div className="header-containerrr">
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="uf-back-btn"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                    >
+                        <img src="/uploads/house-fill.svg" alt="Back" className="home-icon" />
+                    </button>
+                    <h2 className="list_form_headiii">VIEW RECORD</h2>
+                    <button
+                        className="uf-edit-switch-btn"
+                        onClick={() => navigate(`/customers/phone/${formData.phone_no || phone_no}`, { state: { customer, permissions: location.state?.permissions, readOnly: false } })}
+                        style={{
+                            background: '#1a73e8', color: 'white', border: 'none',
+                            padding: '6px 16px', borderRadius: '8px', cursor: 'pointer',
+                            fontWeight: 600, fontSize: '0.85rem'
+                        }}
+                    >
+                        ✏️ Edit
+                    </button>
+                </div>
+
+                <div className="use-last-container">
+                    <div className="use-form-container">
+                        <div className="customer-info-header">
+                            <div className="customer-info-section">
+                                <div className="customer-name">{formData.first_name} {formData.last_name}</div>
+                                <div className="customer-phone">{formatPhoneForDisplay(formData.phone_no)}</div>
+                            </div>
+                        </div>
+
+                        <div className="uf-view-grid">
+                            {/* Fixed fields */}
+                            <div className="uf-view-field">
+                                <span className="uf-view-label">Agent</span>
+                                <span className="uf-view-value">{formData.agent_name || '—'}</span>
+                            </div>
+
+                            <div className="uf-view-field">
+                                <span className="uf-view-label">Last Updated</span>
+                                <span className="uf-view-value">
+                                    {formData.last_updated ? new Date(formData.last_updated).toLocaleString() : '—'}
+                                </span>
+                            </div>
+
+                            {/* Dynamic custom fields */}
+                            {customFields.map(field => {
+                                const label = field.COLUMN_NAME.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                                const value = formData[field.COLUMN_NAME];
+                                return (
+                                    <div key={field.COLUMN_NAME} className="uf-view-field">
+                                        <span className="uf-view-label">{label}</span>
+                                        <span className="uf-view-value">{value || '—'}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <div>
+                        <LastChanges
+                            customerId={customer?.id || ''}
+                            phone_no={formData?.phone_no || ''}
+                            refreshKey={historyRefreshKey}
+                        />
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div>
@@ -457,9 +497,13 @@ const UseForm = () => {
                 </Link>
                 <h2 className="list_form_headiii">EDIT RECORD</h2>
             </div>
+
+            {/* Inline Save Toast — appears near Update button, not screen-wide */}
+
             <div className="use-last-container">
-                <div className="use-form-container">
-                    <div className="customer-info-header">
+                <div className="use-form-container"><br />
+                    <div className="customer-info-header"><br />
+
                         <div className="customer-info-section">
                             <div className="customer-name">
                                 {formData.first_name} {formData.last_name}
@@ -517,6 +561,18 @@ const UseForm = () => {
                                 className="agent-input"
                             />
                         </div>
+
+                        {formData.last_updated && (
+                            <div className="label-input">
+                                <label>Last Updated:</label>
+                                <input
+                                    type="text"
+                                    value={new Date(formData.last_updated).toLocaleString()}
+                                    disabled
+                                    className="agent-input"
+                                />
+                            </div>
+                        )}
 
                         {/* Dynamic Custom Fields */}
                         {customFields.map(field => {
@@ -609,6 +665,11 @@ const UseForm = () => {
                         })}
 
                         <button className="sbt-use-btn" type="submit">Update</button>
+                        {saveSuccess && (
+                            <span className="uf-inline-toast">
+                                ✅ Saved! Update history refreshed in the panel →
+                            </span>
+                        )}
                     </form>
                     {hasDeletePermission && (
                         <button
@@ -622,10 +683,11 @@ const UseForm = () => {
                 </div>
 
                 <div>
-                    {/* Pass customerId to LastChanges */}
+                    {/* Pass customerId and refreshKey to LastChanges */}
                     <LastChanges
                         customerId={customer?.id || ''}
                         phone_no={formData?.phone_no || ''}
+                        refreshKey={historyRefreshKey}
                     />
                 </div>
             </div>

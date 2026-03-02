@@ -1,12 +1,14 @@
 // src/context/PopupContext.js
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
 const PopupContext = createContext();
 
 export const PopupProvider = ({ children }) => {
   const [popupMessages, setPopupMessages] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [pendingApprovals, setPendingApprovals] = useState([]);
 
   const addPopupMessage = (popup) => {
     setPopupMessages(prevMessages => {
@@ -31,7 +33,7 @@ export const PopupProvider = ({ children }) => {
     setPopupMessages(prevMessages => prevMessages.filter((_, i) => i !== index));
   };
 
-  const getReminders = async () => {
+  const getReminders = useCallback(async () => {
     try {
       const apiUrl = process.env.REACT_APP_API_URL;
       const token = localStorage.getItem('token');
@@ -39,15 +41,13 @@ export const PopupProvider = ({ children }) => {
       if (!token) return;
 
       const response = await axios.get(`${apiUrl}/customers/reminders`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
       // Process reminders for popup notifications
       response.data.forEach(reminder => {
         const minutesUntil = Math.floor((new Date(reminder.scheduled_at) - new Date()) / (1000 * 60));
-        
+
         // Only show popup for reminders within 15 minutes
         if (minutesUntil <= 15) {
           let priority;
@@ -77,20 +77,99 @@ export const PopupProvider = ({ children }) => {
     } catch (error) {
       console.error('Error fetching reminders:', error);
     }
-  };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Poll for notifications and pending delete approval requests
+  const fetchNotificationsAndApprovals = useCallback(async () => {
+    try {
+      const apiUrl = process.env.REACT_APP_API_URL;
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      // 1. Fetch pending approvals (for popups)
+      const approvalsRes = await axios.get(`${apiUrl}/customer-delete-requests/pending`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const approvals = approvalsRes.data?.data || [];
+      setPendingApprovals(approvals);
+
+      // 2. Fetch notifications (for badge and popups)
+      const notificationsRes = await axios.get(`${apiUrl}/notifications`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const notifications = notificationsRes.data?.data || [];
+      setUnreadCount(notificationsRes.data?.unreadCount || 0);
+
+      // Push a popup card for each new pending approval (not already shown)
+      approvals.forEach(approval => {
+        setPopupMessages(prev => {
+          const alreadyShown = prev.some(m => m.type === 'delete_request' && m.requestId === approval.id);
+          if (alreadyShown) return prev;
+          return [
+            ...prev,
+            {
+              type: 'delete_request',
+              requestId: approval.id,
+              requesterName: approval.requester_name,
+              customerName: approval.customer_name,
+              customerId: approval.customer_id,
+              createdAt: approval.created_at
+            }
+          ];
+        });
+      });
+
+      // Push a popup card for unread delete outcome notifications
+      notifications.forEach(notif => {
+        if ((notif.type === 'delete_approved' || notif.type === 'delete_rejected') && !notif.is_read) {
+          setPopupMessages(prev => {
+            const alreadyShown = prev.some(m => m.notificationId === notif.id);
+            if (alreadyShown) return prev;
+            return [
+              ...prev,
+              {
+                type: 'notification',
+                notificationId: notif.id,
+                title: notif.title,
+                message: notif.message,
+                notifType: notif.type,
+                createdAt: notif.created_at
+              }
+            ];
+          });
+        }
+      });
+    } catch (error) {
+      if (error.response?.status !== 403 && error.response?.status !== 404) {
+        console.error('Error fetching notifications/approvals:', error);
+      }
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    // Initial fetch
+    // Initial fetches
     getReminders();
+    fetchNotificationsAndApprovals();
 
-    // Set up polling every minute
-    const interval = setInterval(getReminders, 60000);
+    // Poll every 60 seconds
+    const remindersInterval = setInterval(getReminders, 60000);
+    const notificationsInterval = setInterval(fetchNotificationsAndApprovals, 30000); // Poll notifications more frequently
 
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      clearInterval(remindersInterval);
+      clearInterval(notificationsInterval);
+    };
+  }, [getReminders, fetchNotificationsAndApprovals]);
 
   return (
-    <PopupContext.Provider value={{ popupMessages, addPopupMessage, removePopupMessage }}>
+    <PopupContext.Provider value={{
+      popupMessages,
+      addPopupMessage,
+      removePopupMessage,
+      unreadCount,
+      pendingApprovals,
+      refreshApprovals: fetchNotificationsAndApprovals
+    }}>
       {children}
     </PopupContext.Provider>
   );

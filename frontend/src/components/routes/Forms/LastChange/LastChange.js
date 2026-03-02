@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios"; // Import axios for making API requests
 import "./LastChange.css";
 
-const LastChanges = ({ customerId, phone_no }) => {
+const LastChanges = ({ customerId, phone_no, refreshKey }) => {
   const [changes, setChanges] = useState([]);
 
   useEffect(() => {
@@ -46,7 +46,7 @@ const LastChanges = ({ customerId, phone_no }) => {
     };
 
     fetchChangeHistory();
-  }, [customerId]); // Fetch history whenever customerId changes
+  }, [customerId, refreshKey]); // Fetch history whenever customerId or refreshKey changes
 
   // Dynamic field name formatting - converts snake_case to Title Case
   const formatFieldName = (fieldName) => {

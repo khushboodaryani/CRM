@@ -13,7 +13,6 @@ const ListForm = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [customersPerPage] = useState(20);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
   const [error, setError] = useState(null);
   const [permissions, setPermissions] = useState({});
   const [canAssignTeam, setCanAssignTeam] = useState(false);
@@ -35,7 +34,6 @@ const ListForm = () => {
         });
 
         const userData = userResponse.data;
-        setUser(userData);
         console.log('User data:', userData);
 
         // Get permissions from stored user data
@@ -57,7 +55,10 @@ const ListForm = () => {
         setCanAssignTeam(hasTeamAssignRole);
 
         // Determine if user can delete (based on role and permission)
-        setCanDeleteCustomers(hasTeamAssignRole && userPermissions.includes('delete_customer'));
+        // sub_dept_admin and dept_admin also get the delete button (approval flow handles enforcement)
+        const canDeleteRole = userData &&
+          ['super_admin', 'it_admin', 'business_head', 'team_leader', 'sub_dept_admin', 'dept_admin'].includes(userData.role);
+        setCanDeleteCustomers(canDeleteRole && userPermissions.includes('delete_customer'));
 
         // Fetch customers based on user role and permissions
         let customerEndpoint;
@@ -176,7 +177,7 @@ const ListForm = () => {
             return (
               pageNumber === 1 || // Always show the first page
               pageNumber === totalPages || // Always show the last page
-              pageNumber >= currentPage - 1 && pageNumber <= currentPage + 1 // Show current page and adjacent pages
+              (pageNumber >= currentPage - 1 && pageNumber <= currentPage + 1) // Show current page and adjacent pages
             );
           })
           .map((pageNumber, index, array) => {
@@ -209,7 +210,7 @@ const ListForm = () => {
   };
 
   const handleSelectCustomer = (customer) => {
-    if (!canAssignTeam) return;
+    if (!canAssignTeam && !canDeleteCustomers) return;
 
     setSelectedCustomers(prev => {
       const isSelected = prev.find(c => c.id === customer.id);
@@ -222,7 +223,7 @@ const ListForm = () => {
   };
 
   const handleSelectAll = () => {
-    if (!canAssignTeam) return;
+    if (!canAssignTeam && !canDeleteCustomers) return;
 
     if (selectedCustomers.length === currentCustomers.length) {
       setSelectedCustomers([]);
@@ -270,19 +271,6 @@ const ListForm = () => {
     }
   };
 
-  // Function to format the last updated timestamp
-  const formatDateTime = (dateString) => {
-    const options = {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    };
-    return new Date(dateString).toLocaleString('en-GB', options);
-  };
 
   // Change page
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
@@ -318,13 +306,46 @@ const ListForm = () => {
     }
 
     const confirmDelete = window.confirm(`Are you sure you want to delete ${selectedCustomers.length} selected customers?`);
+    console.log('[DEBUG] Delete confirmed. Selected:', selectedCustomers.length);
     if (!confirmDelete) return;
 
     try {
       const token = localStorage.getItem('token');
       const customerIds = selectedCustomers.map(c => c.id);
 
-      const response = await axios.post(`${apiUrl}/customers/delete-multiple`,
+      // Check if current user needs approval before deleting
+      const meResponse = await axios.get(`${apiUrl}/current-user`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+      });
+      const me = meResponse.data;
+      console.log('[DEBUG] Me data from current-user:', me);
+      const approvalRoles = ['team_leader', 'sub_dept_admin'];
+      const needsApproval = approvalRoles.includes(me.role) && me.requires_delete_approval;
+      console.log('[DEBUG] Needs approval?', needsApproval);
+
+      if (needsApproval) {
+        // Send individual approval requests for each selected customer
+        let sent = 0;
+        for (const c of selectedCustomers) {
+          try {
+            await axios.post(
+              `${apiUrl}/customers/${c.id}/request-delete`,
+              {},
+              { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+            );
+            sent++;
+          } catch (e) {
+            // Ignore duplicate-request errors silently
+            if (e.response?.status !== 409) console.error(`Failed to request delete for customer ${c.id}:`, e);
+          }
+        }
+        setSelectedCustomers([]);
+        alert(`${sent} approval request(s) sent. You will be notified once reviewed.`);
+        return;
+      }
+
+      // Direct delete — no approval needed
+      await axios.post(`${apiUrl}/customers/delete-multiple`,
         { customerIds },
         {
           headers: {
@@ -362,7 +383,7 @@ const ListForm = () => {
                   <table className="customers-table">
                     <thead>
                       <tr className="customer-row">
-                        {canAssignTeam && (
+                        {(canAssignTeam || canDeleteCustomers) && (
                           <th>
                             <input
                               type="checkbox"
@@ -388,7 +409,7 @@ const ListForm = () => {
                           className="clickable-row"
                           title="Click to view details"
                         >
-                          {canAssignTeam && (
+                          {(canAssignTeam || canDeleteCustomers) && (
                             <td onClick={(e) => e.stopPropagation()}>
                               <input
                                 type="checkbox"
@@ -410,8 +431,8 @@ const ListForm = () => {
               )}
             </div>
 
-            {/* Team assignment and delete controls */}
-            {canAssignTeam && (
+            {/* Controls — always show if user can delete or assign */}
+            {(canAssignTeam || canDeleteCustomers) && (
               <div className="team-assignment-controls">
                 {/* Only show delete button if user has delete permission */}
                 {canDeleteCustomers && (
@@ -424,26 +445,30 @@ const ListForm = () => {
                   </button>
                 )}
 
-                {/* Team assignment controls always visible if canAssignTeam */}
-                <select
-                  value={selectedTeamUser}
-                  onChange={(e) => setSelectedTeamUser(e.target.value)}
-                  className="team-user-select"
-                >
-                  <option value="">Select User</option>
-                  {availableAgents.map(agent => (
-                    <option key={agent.id} value={agent.id}>
-                      {agent.username} {agent.role === 'user' ? '(Agent)' : `(${agent.role})`}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  onClick={handleAssignTeam}
-                  className="assign-team-btn"
-                  disabled={!selectedTeamUser || selectedCustomers.length === 0}
-                >
-                  Assign to Selected User
-                </button>
+                {/* Team assignment controls — only for admin/team_leader roles */}
+                {canAssignTeam && (
+                  <>
+                    <select
+                      value={selectedTeamUser}
+                      onChange={(e) => setSelectedTeamUser(e.target.value)}
+                      className="team-user-select"
+                    >
+                      <option value="">Select User</option>
+                      {availableAgents.map(agent => (
+                        <option key={agent.id} value={agent.id}>
+                          {agent.username} {agent.role === 'user' ? '(Agent)' : `(${agent.role})`}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={handleAssignTeam}
+                      className="assign-team-btn"
+                      disabled={!selectedTeamUser || selectedCustomers.length === 0}
+                    >
+                      Assign to Selected User
+                    </button>
+                  </>
+                )}
               </div>
             )}
 

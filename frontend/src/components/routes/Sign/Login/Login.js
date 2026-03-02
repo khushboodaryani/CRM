@@ -162,6 +162,8 @@ const Login = () => {
                     navigate('/admin', { replace: true });
                 } else if (tokenData.role === 'mis') {
                     navigate('/upload', { replace: true });
+                } else if (tokenData.role === 'dept_admin' || tokenData.role === 'sub_dept_admin' || tokenData.role === 'admin') {
+                    navigate('/dept-admin', { replace: true });
                 } else {
                     navigate('/customers', { replace: true });
                 }

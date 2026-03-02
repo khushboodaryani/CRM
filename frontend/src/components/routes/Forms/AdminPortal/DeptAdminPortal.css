@@ -1,0 +1,1028 @@
+/* DeptAdminPortal.css — Enhanced v3 */
+
+.dap-container {
+    min-height: 100vh;
+    background: #1e2d3d;
+    padding: 0 0 5rem;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: #333;
+}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.dap-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 2rem 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dap-header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.dap-title {
+    color: #EF6F53;
+    font-size: 1.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05rem;
+    margin: 0;
+}
+
+.dap-subtitle {
+    color: #a0b4c8;
+    font-size: 0.88rem;
+    margin: 5px 0 0;
+}
+
+.dap-header-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.dap-refresh-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #a0b4c8;
+    padding: 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    transition: all 0.2s;
+}
+
+.dap-refresh-btn:hover {
+    background: rgba(239, 111, 83, 0.1);
+    color: #EF6F53;
+    border-color: #EF6F53;
+}
+
+/* ── Unified Button System ──────────────────────────────────────── */
+.dap-btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1.5px solid transparent;
+    /* Added for alignment */
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: all 0.2s;
+    letter-spacing: 0.01rem;
+    height: 38px;
+    /* Fixed height for uniform alignment */
+}
+
+.dap-btn-primary {
+    background: #10b981;
+    color: white;
+    box-shadow: 0 3px 8px rgba(16, 185, 129, 0.35);
+}
+
+.dap-btn-primary:hover {
+    background: #059669;
+    transform: translateY(-1px);
+    box-shadow: 0 5px 12px rgba(16, 185, 129, 0.45);
+}
+
+.dap-btn-secondary {
+    background: #1a73e8;
+    color: white;
+    height: 40px !important;
+    /* Force match with inputs */
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dap-btn-secondary:hover {
+    background: #1557b0;
+    transform: translateY(-1px);
+}
+
+.dap-btn-outline {
+    background: #2d4a63;
+    border: 1.5px solid #a0b4c8;
+    color: #e0e8f0;
+}
+
+.dap-btn-outline:hover {
+    background: #3a5a74;
+    border-color: #EF6F53;
+    color: #EF6F53;
+    transform: translateY(-1px);
+}
+
+/* Legacy support */
+.dap-btn-blue {
+    background: #1a73e8;
+    color: white;
+    border: none;
+    padding: 8px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.88rem;
+    transition: all 0.2s;
+}
+
+.dap-btn-blue:hover {
+    background: #1557b0;
+}
+
+.dap-btn-green {
+    background: #10b981;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    font-weight: 600;
+}
+
+/* ── Stats ──────────────────────────────────────────────────────── */
+.dap-stats {
+    display: flex;
+    gap: 12px;
+    padding: 1rem 2rem;
+    flex-wrap: wrap;
+}
+
+.dap-stat-card {
+    background: linear-gradient(135deg, #2d4a63, #364c63);
+    border: 1px solid rgba(239, 111, 83, 0.25);
+    border-radius: 10px;
+    padding: 12px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 110px;
+    transition: transform 0.2s;
+}
+
+.dap-stat-card.clickable {
+    cursor: pointer;
+}
+
+.dap-stat-card:hover {
+    transform: translateY(-2px);
+}
+
+.dap-stat-card.clickable:hover {
+    border-color: #EF6F53;
+    box-shadow: 0 4px 12px rgba(239, 111, 83, 0.2);
+}
+
+.dap-stat-num {
+    color: #EF6F53;
+    font-size: 1.6rem;
+    font-weight: 800;
+}
+
+.dap-stat-label {
+    color: #a0b4c8;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04rem;
+    margin-top: 2px;
+}
+
+/* ── Filters ─────────────────────────────────────────────────────── */
+.dap-filters {
+    display: flex;
+    gap: 12px;
+    padding: 1.25rem 2rem;
+    flex-wrap: nowrap;
+    /* Prevent wrapping for alignment */
+    align-items: center;
+    background: #1e2d3d;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.dap-select,
+.dap-search {
+    padding: 8px 12px;
+    border: 1.5px solid #3a5068;
+    border-radius: 8px;
+    background: #253647;
+    color: #e0e8f0;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+    height: 40px !important;
+    /* Force uniform height */
+    line-height: normal;
+}
+
+.dap-select:focus,
+.dap-search:focus {
+    border-color: #EF6F53;
+}
+
+.dap-search {
+    flex: 1;
+    min-width: 200px;
+}
+
+.dap-search::placeholder {
+    color: #6a8099;
+}
+
+/* Active filter breadcrumb */
+.dap-filter-label {
+    padding: 0.4rem 2rem;
+    color: #a0b4c8;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.dap-filter-label strong {
+    color: #EF6F53;
+}
+
+.dap-clear-filter {
+    background: none;
+    border: none;
+    color: #6a8099;
+    cursor: pointer;
+    font-size: 0.8rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: color 0.2s;
+}
+
+.dap-clear-filter:hover {
+    color: #EF6F53;
+}
+
+/* ── Table ───────────────────────────────────────────────────────── */
+.dap-table-wrap {
+    margin: 0 2rem;
+    background: white;
+    border-radius: 12px;
+    overflow: auto;
+    /* Restored horizontal and vertical scroll */
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    max-height: 60vh;
+}
+
+.dap-loading,
+.dap-empty {
+    text-align: center;
+    padding: 3rem;
+    color: #888;
+    font-size: 1rem;
+}
+
+.dap-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.dap-table th {
+    padding: 13px 14px;
+    text-align: left;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    letter-spacing: 0.05rem;
+    border-bottom: 2px solid #3a5068;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Standard Padding for table cells */
+.dap-table th,
+.dap-table td {
+    padding: 12px 14px;
+    text-align: left;
+}
+
+/* Actions */
+
+.dap-table td {
+    padding: 11px 14px;
+    border-bottom: 1px solid #f0f0f0;
+    vertical-align: middle;
+    color: #2c3e50;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dap-row {
+    transition: background 0.1s;
+}
+
+.dap-row:hover {
+    background: #f0f7ff;
+}
+
+.dap-row-selected {
+    background: #e8f4fd !important;
+}
+
+/* Table cell helpers */
+.dap-num {
+    color: #94a3b8;
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+.dap-uid {
+    font-family: monospace;
+    font-size: 0.8rem;
+    color: #1a73e8;
+}
+
+.dap-name {
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.dap-phone {
+    color: #475569;
+    font-size: 0.88rem;
+}
+
+.dap-agent {
+    color: #64748b;
+    font-size: 0.88rem;
+}
+
+.dap-updated {
+    font-size: 0.8rem;
+    color: #64748b;
+    white-space: nowrap;
+}
+
+/* Dept badge */
+.dap-dept-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.dap-badge-dept {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #1a73e8;
+    background: #e8f0fe;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.dap-badge-subdept {
+    font-size: 0.7rem;
+    color: #64748b;
+    background: #f1f5f9;
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+}
+
+/* ── Action Buttons (table) ─────────────────────────────────────── */
+.dap-action-btns {
+    display: flex;
+    gap: 6px;
+}
+
+.dap-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 0.03rem;
+}
+
+.dap-action-btn.view {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.dap-action-btn.view:hover {
+    background: #1976d2;
+    color: white;
+    transform: translateY(-1px);
+}
+
+.dap-action-btn.edit {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.dap-action-btn.edit:hover {
+    background: #2e7d32;
+    color: white;
+    transform: translateY(-1px);
+}
+
+.dap-action-btn.history {
+    background: #fff3e0;
+    color: #ef6c00;
+}
+
+.dap-action-btn.history:hover {
+    background: #ef6c00;
+    color: white;
+    transform: translateY(-1px);
+}
+
+.dap-action-btn.delete {
+    background: #ffebee;
+    color: #c62828;
+}
+
+.dap-action-btn.delete:hover {
+    background: #c62828;
+    color: white;
+    transform: translateY(-1px);
+}
+
+/* Legacy button support */
+.dap-view-btn {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.dap-edit-btn {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.dap-delete-btn {
+    background: #ffebee;
+    color: #c62828;
+}
+
+/* ── Bulk Actions ────────────────────────────────────────────────── */
+.dap-bulk-actions {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #253647;
+    padding: 1rem 2rem;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    z-index: 1000;
+    border: 1px solid #3a5068;
+    animation: slideUp 0.2s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateX(-50%) translateY(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+    }
+}
+
+.dap-selected-count {
+    font-weight: 700;
+    color: #EF6F53;
+    font-size: 0.95rem;
+}
+
+.dap-assign-box {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.dap-select-sm {
+    padding: 6px 12px;
+    border: 1px solid #3a5068;
+    background: #1e2d3d;
+    color: white;
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+/* ── My Teams Section ───────────────────────────────────────────── */
+.dap-teams-section {
+    margin: 2rem 2rem 0;
+}
+
+.dap-teams-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #2d4a63, #364c63);
+    color: #e0e8f0;
+    border: 1px solid rgba(239, 111, 83, 0.3);
+    padding: 10px 20px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 0.92rem;
+    font-weight: 600;
+    transition: all 0.2s;
+    letter-spacing: 0.02rem;
+}
+
+.dap-teams-toggle:hover {
+    border-color: #EF6F53;
+    color: #EF6F53;
+    transform: translateY(-1px);
+}
+
+.dap-teams-grid {
+    display: flex;
+    overflow-x: auto;
+    gap: 1.75rem;
+    margin-top: 1rem;
+    padding-bottom: 20px;
+    scrollbar-width: thin;
+    scrollbar-color: #EF6F53 #e2e8f0;
+}
+
+.dap-teams-grid::-webkit-scrollbar {
+    height: 8px;
+}
+
+.dap-teams-grid::-webkit-scrollbar-track {
+    background: #e2e8f0;
+    border-radius: 10px;
+}
+
+.dap-teams-grid::-webkit-scrollbar-thumb {
+    background: #EF6F53;
+    border-radius: 10px;
+}
+
+.dap-team-card {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    transition: transform 0.2s, box-shadow 0.2s;
+    flex: 0 0 320px;
+    /* Restored horizontal card width */
+    min-height: 250px;
+}
+
+.dap-team-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.dap-team-header {
+    background: #253647;
+    padding: 14px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.dap-team-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dap-team-icon {
+    color: #EF6F53;
+}
+
+.dap-team-name {
+    color: #e0e8f0;
+    font-weight: 700;
+    font-size: 1rem;
+    flex: 1;
+}
+
+.dap-team-badge {
+    background: rgba(239, 111, 83, 0.15);
+    color: #EF6F53;
+    font-size: 0.72rem;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 700;
+}
+
+/* Custom layout for Team Card Scope Tags */
+.dap-team-scope-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.dap-team-dept-tag {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #a0b4c8;
+    background: rgba(255, 255, 255, 0.07);
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.dap-team-subdept-tag {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #f1f5f9;
+    background: rgba(239, 111, 83, 0.2);
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(239, 111, 83, 0.2);
+}
+
+.dap-team-body {
+    padding: 14px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.dap-team-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.dap-team-group-label {
+    display: block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06rem;
+    color: #94a3b8;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.dap-member-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    transition: background 0.15s;
+    margin-bottom: 4px;
+}
+
+.dap-member-row:hover {
+    background: #f8fafc;
+}
+
+.dap-member-row.tl {
+    background: #fdf4ff;
+    border-left: 3px solid #d946ef;
+}
+
+.dap-member-icon {
+    color: #64748b;
+    font-size: 1rem !important;
+}
+
+.dap-member-icon.tl {
+    color: #a21caf;
+}
+
+.dap-member-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.dap-member-name {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.dap-member-email {
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+.dap-no-members {
+    font-size: 0.82rem;
+    color: #cbd5e1;
+    font-style: italic;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .dap-header {
+        flex-direction: column;
+        gap: 10px;
+        padding: 1rem;
+        align-items: flex-start;
+    }
+
+    .dap-filters {
+        padding: 0.75rem 1rem;
+    }
+
+    .dap-table-wrap {
+        margin: 0 1rem;
+    }
+
+    .dap-stats {
+        padding: 0.75rem 1rem;
+    }
+
+    .dap-teams-section {
+        margin: 1.5rem 1rem 0;
+    }
+
+    .dap-teams-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ── Modals ──────────────────────────────────────────────────────── */
+.dap-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: 20px;
+}
+
+.dap-modal {
+    background: white;
+    width: 100%;
+    max-width: 800px;
+    max-height: 90vh;
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+    from {
+        transform: translateY(30px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.dap-modal-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.dap-modal-header h3 {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #1e293b;
+    font-size: 1.25rem;
+}
+
+.dap-modal-close {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.dap-modal-close:hover {
+    background: #f1f5f9;
+    color: #ef4444;
+}
+
+.dap-modal-body {
+    padding: 24px;
+    overflow-y: auto;
+    background: #f8fafc;
+}
+
+.dap-modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.dap-btn-grey {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.dap-btn-grey:hover {
+    background: #e2e8f0;
+}
+
+.dap-modal-search {
+    padding: 16px 24px;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.dap-modal-search-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    outline: none;
+    transition: all 0.2s;
+    background: white;
+}
+
+.dap-modal-search-input:focus {
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.1);
+}
+
+.dap-modal.member-list-modal {
+    max-width: 900px;
+}
+
+.dap-modal-body.no-padding {
+    padding: 0;
+    height: 450px !important;
+    /* Force a fixed height for scrolling */
+    max-height: 60vh;
+    overflow-y: auto !important;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: #EF6F53 #f1f5f9;
+}
+
+.dap-modal-body.no-padding::-webkit-scrollbar {
+    width: 8px;
+}
+
+.dap-modal-body.no-padding::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+.dap-modal-body.no-padding::-webkit-scrollbar-thumb {
+    background: #EF6F53;
+    border-radius: 10px;
+}
+
+/* Premium Table for Modal */
+.ap-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.ap-table th {
+    background: #f8fafc;
+    padding: 12px 20px;
+    text-align: left;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #475569;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.ap-table td {
+    padding: 12px 20px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+    font-size: 0.88rem;
+    vertical-align: middle;
+}
+
+.ap-name-cell {
+    font-weight: 700;
+    color: #1e293b;
+    font-size: 0.9rem;
+}
+
+.ap-role-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: capitalize;
+    display: inline-block;
+    letter-spacing: 0.01em;
+}
+
+.ap-role-badge.super_admin {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.ap-role-badge.dept_admin {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.ap-role-badge.sub_dept_admin {
+    background: #e0f2fe;
+    color: #075985;
+}
+
+.ap-role-badge.team_leader {
+    background: #fef9c3;
+    color: #854d0e;
+}
+
+.ap-role-badge.user {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.ap-dept-info-cell {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    line-height: 1.3;
+}
+
+.ap-dept-main {
+    font-weight: 700;
+    color: #1e293b;
+    font-size: 0.82rem;
+}
+
+.ap-subdept-sub {
+    font-size: 0.72rem;
+    color: #64748b;
+    font-weight: 500;
+    margin-top: 1px;
+}
+
+.dap-modal-header.dark {
+    background: #1e293b;
+    color: white;
+    padding: 20px 24px !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dap-modal-header.dark h3 {
+    color: white;
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.dap-modal-header.dark p {
+    margin: 4px 0 0;
+    font-size: 0.8rem;
+    color: #94a3b8;
+}
+
+.dap-modal-header.dark .dap-modal-close {
+    color: #94a3b8;
+    padding: 6px;
+    border-radius: 8px;
+}
+
+.dap-modal-header.dark .dap-modal-close:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.1);
+}

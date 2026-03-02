@@ -1,12 +1,12 @@
 // src/components/routes/Other/Header/Upload/UploadNew.js
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import Papa from 'papaparse';
 import { useNavigate } from "react-router-dom";
 import * as XLSX from 'xlsx';
 import axios from 'axios';
 import "./UploadNew.css";
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, IconButton, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Typography, Box, FormControl, RadioGroup, FormControlLabel, Radio } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, IconButton, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Typography, Box, FormControl, RadioGroup, FormControlLabel, Radio, Select, MenuItem, InputLabel } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 
 const UploadNew = () => {
@@ -19,12 +19,23 @@ const UploadNew = () => {
     const [error, setError] = useState("");
     const [customerData, setCustomerData] = useState([]);
     const [uploadResult, setUploadResult] = useState(null);
-    const [uploadId, setUploadId] = useState(null);
     const [isUploading, setIsUploading] = useState(false);
     const [duplicateRecords, setDuplicateRecords] = useState([]);
-    const [duplicateAction, setDuplicateAction] = useState('skip');
     const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
     const navigate = useNavigate();
+
+    // Lead Distribution State
+    const [showDistributionDialog, setShowDistributionDialog] = useState(false);
+    const [distributionType, setDistributionType] = useState('manual'); // 'manual' | 'auto'
+    const [distributionScope, setDistributionScope] = useState('department'); // 'department' | 'sub_department'
+    const [distributionMethod, setDistributionMethod] = useState('random'); // 'team' | 'random'
+    const [targetTeamId, setTargetTeamId] = useState('');
+    const [targetDepartmentId, setTargetDepartmentId] = useState('');
+    const [targetSubDepartmentId, setTargetSubDepartmentId] = useState('');
+
+    const [departments, setDepartments] = useState([]);
+    const [subDepartments, setSubDepartments] = useState([]);
+    const [teams, setTeams] = useState([]);
 
     // Fetch custom fields from database on component mount
     useEffect(() => {
@@ -89,6 +100,54 @@ const UploadNew = () => {
         fetchCustomFields();
     }, []);
 
+    // Fetch Departments and Teams
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const apiUrl = process.env.REACT_APP_API_URL;
+                const headers = { Authorization: `Bearer ${token}` };
+
+                const [deptRes, teamRes] = await Promise.all([
+                    axios.get(`${apiUrl}/departments`, { headers }),
+                    axios.get(`${apiUrl}/teams`, { headers }) // Updated endpoint
+                ]);
+
+                if (deptRes.data.success) setDepartments(deptRes.data.data); // Fixed property to .data
+                if (teamRes.data.success) setTeams(teamRes.data.teams);
+
+            } catch (err) {
+                console.error('Error fetching dropdown data:', err);
+            }
+        };
+        fetchData();
+    }, []);
+
+    // Fetch sub-departments when department changes
+    useEffect(() => {
+        const fetchSubDepartments = async () => {
+            if (targetDepartmentId) {
+                try {
+                    const token = localStorage.getItem('token');
+                    const apiUrl = process.env.REACT_APP_API_URL;
+                    const response = await axios.get(`${apiUrl}/departments/${targetDepartmentId}/sub-departments`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    if (response.data.success) {
+                        setSubDepartments(response.data.data);
+                    }
+                } catch (err) {
+                    console.error('Error fetching sub-departments:', err);
+                    setSubDepartments([]);
+                }
+            } else {
+                setSubDepartments([]);
+            }
+        };
+
+        fetchSubDepartments();
+    }, [targetDepartmentId]);
+
     // Use dynamic values
     const headerLabels = headerLabelsState;
 
@@ -136,9 +195,7 @@ const UploadNew = () => {
         return normalizedPhone.length <= 12 && /^\d+$/.test(normalizedPhone);
     };
 
-    const validateEmail = (email) => {
-        return emailRegex.test(String(email).toLowerCase());
-    };
+
 
     // Function to validate enum values (case-insensitive with format variations)
     const validateEnumValue = (fieldName, value) => {
@@ -193,8 +250,8 @@ const UploadNew = () => {
                 errors.push(`Row ${index + 1}: Invalid phone number "${mappedPhone}". Phone numbers must be numeric and maximum 15 digits.`);
             }
 
-            // Validate agent name is not empty
-            if (!mappedAgent || !mappedAgent.trim()) {
+            // Validate agent name ONLY if manual distribution
+            if (distributionType === 'manual' && (!mappedAgent || !mappedAgent.trim())) {
                 errors.push(`Row ${index + 1}: Agent name is required but empty.`);
             }
 
@@ -320,8 +377,8 @@ const UploadNew = () => {
         );
     };
 
-    // Handle file upload
-    const handleUpload = async () => {
+    // Handle file upload execution
+    const executeUpload = async (distOptions = null) => {
         setIsUploading(true);
         setError(null);
 
@@ -330,12 +387,20 @@ const UploadNew = () => {
             const userData = JSON.parse(localStorage.getItem('user'));
             const isMisRole = userData?.role === 'mis';
 
+            const effectiveDistType = distOptions ? distOptions.type : 'manual';
+
             // Validate that all required fields are mapped
-            const requiredFields = ["first_name", "phone_no", "agent_name"];
+            // If auto-distribution, agent_name is NOT required
+            const requiredFields = ["first_name", "phone_no"];
+            if (effectiveDistType === 'manual') {
+                requiredFields.push("agent_name");
+            }
+
             const missingFields = requiredFields.filter(field => !headerMapping[field]);
 
             if (missingFields.length > 0) {
                 setError(`Please map the following required fields: ${(missingFields || []).map(field => headerLabels[field] || field).join(", ")}`);
+                setIsUploading(false); // Reset loading state
                 return;
             }
 
@@ -355,28 +420,51 @@ const UploadNew = () => {
                     `Row ${index}: Missing ${(missingFields || []).map(field => headerLabels[field] || field).join(", ")}`
                 );
                 setError(`Required fields missing in some rows:\n${errorMessages.join("\n")}`);
+                setIsUploading(false);
                 return;
             }
 
-            // Validate data before upload
-            const validationErrors = validateData(customerData);
+            // Validate data before upload (pass distribution type to skip agent check if auto)
+            // We need to temporarily set state or pass it to validateData? 
+            // validateData uses state 'distributionType'. ensure state is synced or pass arg.
+            // Actually validateData uses the state variable 'distributionType'.
+            // So we should update state before calling executeUpload OR refactor validateData.
+            // Simpler: Validated in handleUploadClick before opening dialog?
+            // No, strictly we should validate here.
+            // But validateData uses the outer state `distributionType`. 
+            // If called from dialog, `distributionType` state is already set. 
+
+            const validationErrors = validateData(customerData); // Uses current state
             if (validationErrors.length > 0) {
                 setError(`Validation errors found:\n${validationErrors.join("\n")}`);
+                setIsUploading(false);
                 return;
             }
 
             const apiUrl = process.env.REACT_APP_API_URL;
+            // Build payload
+            const payload = {
+                headerMapping,
+                customerData: cleanCustomerData(customerData),
+                fileName: selectedFileName
+            };
+
+            if (distOptions && distOptions.type === 'auto') {
+                payload.distributionOptions = {
+                    method: distOptions.method, // 'team' or 'random'
+                    teamId: distOptions.teamId,
+                    departmentId: distOptions.departmentId,
+                    subDepartmentId: distOptions.subDepartmentId
+                };
+            }
+
             const response = await fetch(`${apiUrl}/upload`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
                 },
-                body: JSON.stringify({
-                    headerMapping,
-                    customerData: cleanCustomerData(customerData),
-                    fileName: selectedFileName
-                })
+                body: JSON.stringify(payload)
             });
 
             const result = await response.json();
@@ -404,7 +492,6 @@ const UploadNew = () => {
                 uploadId: result.uploadId
             };
             setUploadResult(uploadResultData);
-            setUploadId(result.uploadId);
 
             // If MIS role, auto-confirm upload and stay on upload page
             if (isMisRole) {
@@ -431,7 +518,52 @@ const UploadNew = () => {
             setError(error.message || 'Failed to upload file');
         } finally {
             setIsUploading(false);
+            setShowDistributionDialog(false);
         }
+    };
+
+    // Initial click on "Submit"
+    const handleUploadClick = () => {
+        // Basic pre-checks
+        if (!selectedFileName || fileHeaders.length === 0) return;
+
+        // Open the distribution dialog
+        setShowDistributionDialog(true);
+    };
+
+    // Confirm from Dialog
+    const handleDistributionConfirm = () => {
+        // Validate distribution options
+        if (distributionType === 'auto') {
+            if (distributionMethod === 'team' && !targetTeamId) {
+                alert("Please select a target team.");
+                return;
+            }
+            if (distributionMethod === 'random') {
+                if (distributionScope === 'department' && !targetDepartmentId) {
+                    alert("Please select a target department.");
+                    return;
+                }
+                if (distributionScope === 'sub_department' && !targetSubDepartmentId) {
+                    alert("Please select a target sub-department.");
+                    return;
+                }
+            }
+        } else {
+            // Manual: Check if agent_name is mapped
+            if (!headerMapping['agent_name']) {
+                alert("For Manual Distribution, you must map the 'Agent Name' column.");
+                return;
+            }
+        }
+
+        executeUpload({
+            type: distributionType,
+            method: distributionMethod,
+            teamId: targetTeamId,
+            departmentId: targetDepartmentId,
+            subDepartmentId: targetSubDepartmentId
+        });
     };
 
     const handleDuplicates = (duplicates) => {
@@ -752,6 +884,148 @@ const UploadNew = () => {
         </Dialog>
     ))();
 
+    // Lead Distribution Dialog
+    const distributionDialog = (
+        <Dialog
+            open={showDistributionDialog}
+            onClose={() => setShowDistributionDialog(false)}
+            maxWidth="sm"
+            fullWidth
+        >
+            <DialogTitle sx={{ backgroundColor: '#364C63', color: 'white' }}>
+                Lead Distribution Options
+            </DialogTitle>
+            <DialogContent sx={{ mt: 2 }}>
+                <FormControl component="fieldset" sx={{ mb: 3, width: '100%' }}>
+                    <Typography variant="subtitle1" gutterBottom>How should leads be assigned?</Typography>
+                    <RadioGroup
+                        value={distributionType}
+                        onChange={(e) => setDistributionType(e.target.value)}
+                    >
+                        <FormControlLabel value="manual" control={<Radio />} label="Manual Assignment" />
+                        <FormControlLabel value="auto" control={<Radio />} label="Automatic Distribution (Round Robin / Weighted)" />
+                    </RadioGroup>
+                </FormControl>
+
+                {distributionType === 'auto' && (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, padding: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
+                        <FormControl fullWidth size="small">
+                            <InputLabel>Distribution Method</InputLabel>
+                            <Select
+                                value={distributionMethod}
+                                label="Distribution Method"
+                                onChange={(e) => setDistributionMethod(e.target.value)}
+                            >
+                                <MenuItem value="random">Random / Round Robin (Department Level)</MenuItem>
+                                <MenuItem value="team">Specific Team (Pool or Leader Rotation)</MenuItem>
+                            </Select>
+                        </FormControl>
+
+                        {distributionMethod === 'team' && (
+                            <>
+                                {/* Step 1: pick a department to scope the team list */}
+                                <FormControl fullWidth size="small">
+                                    <InputLabel>Filter by Department</InputLabel>
+                                    <Select
+                                        value={targetDepartmentId}
+                                        label="Filter by Department"
+                                        onChange={(e) => {
+                                            setTargetDepartmentId(e.target.value);
+                                            setTargetTeamId(''); // reset team when dept changes
+                                        }}
+                                    >
+                                        {departments.map(dept => (
+                                            <MenuItem key={dept.id} value={dept.id}>{dept.department_name}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+
+                                {/* Step 2: pick a team from that department */}
+                                <FormControl fullWidth size="small">
+                                    <InputLabel>Select Target Team</InputLabel>
+                                    <Select
+                                        value={targetTeamId}
+                                        label="Select Target Team"
+                                        onChange={(e) => setTargetTeamId(e.target.value)}
+                                        disabled={!targetDepartmentId}
+                                    >
+                                        {(targetDepartmentId
+                                            ? teams.filter(t => String(t.department_id) === String(targetDepartmentId))
+                                            : teams
+                                        ).length > 0 ? (
+                                            (targetDepartmentId
+                                                ? teams.filter(t => String(t.department_id) === String(targetDepartmentId))
+                                                : teams
+                                            ).map(team => (
+                                                <MenuItem key={team.id} value={team.id}>{team.team_name}</MenuItem>
+                                            ))
+                                        ) : (
+                                            <MenuItem disabled value="">No teams in this department</MenuItem>
+                                        )}
+                                    </Select>
+                                </FormControl>
+                            </>
+                        )}
+
+                        {distributionMethod === 'random' && (
+                            <>
+                                <FormControl fullWidth size="small">
+                                    <InputLabel>Select Scope</InputLabel>
+                                    <Select
+                                        value={distributionScope}
+                                        label="Select Scope"
+                                        onChange={(e) => setDistributionScope(e.target.value)}
+                                    >
+                                        <MenuItem value="department">Whole Department</MenuItem>
+                                        <MenuItem value="sub_department">Sub-Department Only</MenuItem>
+                                    </Select>
+                                </FormControl>
+
+                                <FormControl fullWidth size="small">
+                                    <InputLabel>Target Department</InputLabel>
+                                    <Select
+                                        value={targetDepartmentId}
+                                        label="Target Department"
+                                        onChange={(e) => setTargetDepartmentId(e.target.value)}
+                                    >
+                                        {departments.map(dept => (
+                                            <MenuItem key={dept.id} value={dept.id}>{dept.department_name}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+
+                                {distributionScope === 'sub_department' && (
+                                    <FormControl fullWidth size="small">
+                                        <InputLabel>Target Sub-Department</InputLabel>
+                                        <Select
+                                            value={targetSubDepartmentId}
+                                            label="Target Sub-Department"
+                                            onChange={(e) => setTargetSubDepartmentId(e.target.value)}
+                                        >
+                                            {subDepartments.length > 0 ? (
+                                                subDepartments.map(subDesc => (
+                                                    <MenuItem key={subDesc.id} value={subDesc.id}>{subDesc.sub_department_name}</MenuItem>
+                                                ))
+                                            ) : (
+                                                <MenuItem disabled value="">No Sub-Departments Available</MenuItem>
+                                            )}
+                                        </Select>
+                                    </FormControl>
+                                )}
+                            </>
+                        )}
+                    </Box>
+                )}
+            </DialogContent>
+            <DialogActions sx={{ p: 2 }}>
+                <Button onClick={() => setShowDistributionDialog(false)}>Cancel</Button>
+                <Button onClick={handleDistributionConfirm} variant="contained" color="primary">
+                    Proceed to Upload
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
+
     // Render function that returns the memoized content
     const renderDuplicateDialog = () => duplicateDialog;
 
@@ -815,7 +1089,7 @@ const UploadNew = () => {
                             </div>
                             <div className="submit-container">
                                 <button
-                                    onClick={handleUpload}
+                                    onClick={handleUploadClick}
                                     className="submitt-btnn"
                                     disabled={!selectedFileName || fileHeaders.length === 0}
                                 >
@@ -839,6 +1113,8 @@ const UploadNew = () => {
                         )}
                     </div>
                 )}
+
+                {distributionDialog}
 
                 {error && (
                     <div className="error-messagee">

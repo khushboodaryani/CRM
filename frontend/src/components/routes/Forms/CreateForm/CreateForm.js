@@ -100,7 +100,8 @@ const CreateForm = () => {
         // Define truly system fields that should never be shown
         const systemFields = [
           'id', 'created_at', 'updated_at', 'last_updated',
-          'company_id', 'team_id', 'duplicate_action', 'C_unique_id'
+          'company_id', 'team_id', 'duplicate_action', 'C_unique_id',
+          'department_id', 'sub_department_id', 'assigned_to'
         ];
 
         // Define mandatory fields that are always shown
@@ -182,10 +183,10 @@ const CreateForm = () => {
   // Validate required fields dynamically
   const validateRequiredFields = () => {
     // Get required fields from customFields state
-    const mandatoryFields = ['first_name', 'phone_no', 'agent_name'];
+    const mandatoryFields = ['first_name', 'phone_no', 'agent_name', 'scheduled_at'];
     const allRequiredFields = [
       ...mandatoryFields,
-      ...customFields.filter(f => f.IS_NULLABLE === 'NO').map(f => f.COLUMN_NAME)
+      ...customFields.filter(f => f.IS_NULLABLE === 'NO' && f.COLUMN_NAME !== 'scheduled_at').map(f => f.COLUMN_NAME)
     ];
 
     for (let field of allRequiredFields) {
@@ -525,7 +526,7 @@ const CreateForm = () => {
             if (field.COLUMN_NAME === 'scheduled_at') {
               return (
                 <div key={field.COLUMN_NAME} className="label-input">
-                  <label>{label}{isRequired && <span className="required"> *</span>}:</label>
+                  <label>{label}<span className="required"> *</span>:</label>
                   <input
                     type="datetime-local"
                     name={field.COLUMN_NAME}

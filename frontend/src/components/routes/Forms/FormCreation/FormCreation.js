@@ -8,7 +8,6 @@ import './FormCreation.css';
 const FormCreation = () => {
     const navigate = useNavigate();
     const [customFields, setCustomFields] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [error, setError] = useState('');
 
@@ -65,8 +64,6 @@ const FormCreation = () => {
         } catch (err) {
             console.error('Error fetching fields:', err);
             setError('Failed to load custom fields');
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -166,14 +163,20 @@ const FormCreation = () => {
             <div className="form-layout-preview">
                 {/* Mandatory Section */}
                 <div className="mandatory-section">
-                    <span className="section-label">Mandatory Fields (Non-Editable)</span>
+                    <div className="section-header">
+                        <span className="section-icon">🛡️</span>
+                        <div className="section-text">
+                            <h3 className="section-title">Essential System Fields</h3>
+                            <p className="section-subtitle">These fields are required for the core CRM functionality and cannot be modified.</p>
+                        </div>
+                    </div>
                     <div className="form-grid">
                         {mandatoryFields.map(field => (
                             <div key={field.name} className="field-card mandatory">
-                                <label className="field-label">{field.label} <span style={{ color: 'red' }}>*</span></label>
-                                <input className="field-preview" type="text" disabled placeholder={`Type: ${field.type}`} />
+                                <label className="field-label">{field.label} <span className="required-star">*</span></label>
+                                <input className="field-preview" type="text" disabled placeholder={`Data Type: ${field.type}`} />
                                 <div className="field-meta">
-                                    <span>System Field</span>
+                                    <span className="meta-tag">System Field</span>
                                     <span className="field-type-badge">{field.type}</span>
                                 </div>
                             </div>
@@ -183,22 +186,28 @@ const FormCreation = () => {
 
                 {/* Custom Fields Section */}
                 <div className="custom-section">
-                    <span className="section-label">Custom Fields (Added by You)</span>
+                    <div className="section-header">
+                        <span className="section-icon">✨</span>
+                        <div className="section-text">
+                            <h3 className="section-title">Your Custom Fields</h3>
+                            <p className="section-subtitle">Additional fields you've added to capture specific data for your business.</p>
+                        </div>
+                    </div>
                     <div className="form-grid">
                         {customFields.map(field => (
                             <div key={field.COLUMN_NAME} className="field-card custom">
                                 <label className="field-label">
                                     {field.COLUMN_NAME.replace(/_/g, ' ').toUpperCase()}
-                                    {field.IS_NULLABLE === 'NO' && <span style={{ color: 'red' }}> *</span>}
+                                    {field.IS_NULLABLE === 'NO' && <span className="required-star"> *</span>}
                                 </label>
                                 <input
                                     className="field-preview"
                                     type="text"
                                     disabled
-                                    placeholder={field.COLUMN_DEFAULT ? `Default: ${field.COLUMN_DEFAULT}` : ''}
+                                    placeholder={field.COLUMN_DEFAULT ? `Default: ${field.COLUMN_DEFAULT}` : 'No default value'}
                                 />
                                 <div className="field-meta">
-                                    <span>Custom Field</span>
+                                    <span className="meta-tag">Custom Field</span>
                                     <span className="field-type-badge">{field.DATA_TYPE.toUpperCase()}</span>
                                 </div>
                                 <button
@@ -215,8 +224,9 @@ const FormCreation = () => {
 
                 {/* Add Field Button */}
                 <div className="add-field-section">
-                    <button className="add-field-btn-large" onClick={() => setShowModal(true)}>
-                        <span>+</span> Add New Field
+                    <button className="add-field-btn-premium" onClick={() => setShowModal(true)}>
+                        <span className="btn-icon">+</span>
+                        <span className="btn-text">Define New Custom Field</span>
                     </button>
                 </div>
             </div>
@@ -224,93 +234,123 @@ const FormCreation = () => {
             {/* Modal */}
             {showModal && (
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                    <div className="modal-content" onClick={e => e.stopPropagation()}>
-                        <h3>Add Custom Field</h3>
-                        {error && <div style={{ color: 'red', marginBottom: '10px' }}>{error}</div>}
+                    <div className="modal-content premium-modal" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header-premium">
+                            <div className="header-content">
+                                <h3>Create Custom Field</h3>
+                                <p>Define a new data column for your CRM records</p>
+                            </div>
+                            <button className="close-modal-btn" onClick={() => setShowModal(false)}>&times;</button>
+                        </div>
 
-                        <div className="field-form">
-                            <input
-                                type="text"
-                                value={newField.fieldName}
-                                onChange={(e) => handleFieldInputChange('fieldName', e.target.value)}
-                                placeholder="Field Name (e.g., Customer Type)"
-                            />
+                        {error && <div className="modal-error-message">{error}</div>}
 
-                            <select
-                                value={newField.fieldType}
-                                onChange={(e) => handleFieldInputChange('fieldType', e.target.value)}
-                            >
-                                <option value="VARCHAR">Text (VARCHAR)</option>
-                                <option value="TEXT">Long Text (TEXT)</option>
-                                <option value="INT">Number (INT)</option>
-                                <option value="DECIMAL">Decimal (DECIMAL)</option>
-                                <option value="DATE">Date</option>
-                                <option value="DATETIME">Date & Time</option>
-                                <option value="ENUM">Dropdown (ENUM)</option>
-                            </select>
+                        <div className="premium-form">
+                            <div className="form-row">
+                                <div className="form-group full">
+                                    <label>Display Name</label>
+                                    <input
+                                        type="text"
+                                        value={newField.fieldName}
+                                        onChange={(e) => handleFieldInputChange('fieldName', e.target.value)}
+                                        placeholder="e.g., WhatsApp Number, Customer Interest"
+                                        autoFocus
+                                    />
+                                </div>
+                            </div>
 
-                            {newField.fieldType === 'VARCHAR' && (
-                                <input
-                                    type="number"
-                                    value={newField.fieldLength}
-                                    onChange={(e) => handleFieldInputChange('fieldLength', e.target.value)}
-                                    placeholder="Max Length"
-                                    min="1"
-                                    max="65535"
-                                />
-                            )}
+                            <div className="form-row split">
+                                <div className="form-group">
+                                    <label>Data Type</label>
+                                    <select
+                                        value={newField.fieldType}
+                                        onChange={(e) => handleFieldInputChange('fieldType', e.target.value)}
+                                    >
+                                        <option value="VARCHAR">Short Text (VARCHAR)</option>
+                                        <option value="TEXT">Long Text (TEXT)</option>
+                                        <option value="INT">Whole Number (INT)</option>
+                                        <option value="DECIMAL">Price/Decimal (DECIMAL)</option>
+                                        <option value="DATE">Calendar Date</option>
+                                        <option value="DATETIME">Date & Time</option>
+                                        <option value="ENUM">Fixed Dropdown (ENUM)</option>
+                                    </select>
+                                </div>
+
+                                {newField.fieldType === 'VARCHAR' && (
+                                    <div className="form-group">
+                                        <label>Max Characters</label>
+                                        <input
+                                            type="number"
+                                            value={newField.fieldLength}
+                                            onChange={(e) => handleFieldInputChange('fieldLength', e.target.value)}
+                                            placeholder="255"
+                                            min="1"
+                                            max="65535"
+                                        />
+                                    </div>
+                                )}
+                            </div>
 
                             {newField.fieldType === 'ENUM' && (
-                                <div className="enum-values">
-                                    <label>Dropdown Options:</label>
-                                    {newField.enumValues.map((value, index) => (
-                                        <div key={index} className="enum-value-row">
-                                            <input
-                                                type="text"
-                                                value={value}
-                                                onChange={(e) => handleEnumValueChange(index, e.target.value)}
-                                                placeholder={`Option ${index + 1}`}
-                                            />
-                                            {newField.enumValues.length > 1 && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeEnumValue(index)}
-                                                    className="remove-enum-btn"
-                                                >
-                                                    ×
-                                                </button>
-                                            )}
-                                        </div>
-                                    ))}
+                                <div className="enum-builder">
+                                    <label>Dropdown Options</label>
+                                    <div className="enum-list">
+                                        {newField.enumValues.map((value, index) => (
+                                            <div key={index} className="enum-input-wrap">
+                                                <input
+                                                    type="text"
+                                                    value={value}
+                                                    onChange={(e) => handleEnumValueChange(index, e.target.value)}
+                                                    placeholder={`Option ${index + 1}`}
+                                                />
+                                                {newField.enumValues.length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeEnumValue(index)}
+                                                        className="remove-option-btn"
+                                                    >
+                                                        &times;
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
                                     <button
                                         type="button"
                                         onClick={addEnumValue}
-                                        className="add-enum-btn"
+                                        className="add-option-link"
                                     >
-                                        + Add Option
+                                        + Add another option
                                     </button>
                                 </div>
                             )}
 
-                            <input
-                                type="text"
-                                value={newField.defaultValue}
-                                onChange={(e) => handleFieldInputChange('defaultValue', e.target.value)}
-                                placeholder="Default Value (optional)"
-                            />
+                            <div className="form-row">
+                                <div className="form-group full">
+                                    <label>Default Value (Optional)</label>
+                                    <input
+                                        type="text"
+                                        value={newField.defaultValue}
+                                        onChange={(e) => handleFieldInputChange('defaultValue', e.target.value)}
+                                        placeholder="What should be pre-filled?"
+                                    />
+                                </div>
+                            </div>
 
-                            <label className="checkbox-label">
-                                <input
-                                    type="checkbox"
-                                    checked={newField.isRequired}
-                                    onChange={(e) => handleFieldInputChange('isRequired', e.target.checked)}
-                                />
-                                Required Field
-                            </label>
+                            <div className="form-footer-options">
+                                <label className="premium-checkbox">
+                                    <input
+                                        type="checkbox"
+                                        checked={newField.isRequired}
+                                        onChange={(e) => handleFieldInputChange('isRequired', e.target.checked)}
+                                    />
+                                    <span className="checkbox-text">Make this field mandatory</span>
+                                </label>
+                            </div>
 
-                            <div className="modal-actions">
-                                <button onClick={handleCreateField} className="create-button">Create Field</button>
-                                <button onClick={() => setShowModal(false)} className="cancel-button">Cancel</button>
+                            <div className="premium-modal-actions">
+                                <button onClick={() => setShowModal(false)} className="btn-cancel">Cancel</button>
+                                <button onClick={handleCreateField} className="btn-submit">Initialize Field</button>
                             </div>
                         </div>
                     </div>

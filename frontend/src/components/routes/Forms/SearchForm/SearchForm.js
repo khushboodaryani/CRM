@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useLocation, useNavigate, Link } from "react-router-dom";
-import "./SearchForm.css"; 
+import "./SearchForm.css";
 
 const SearchForm = () => {
   const [searchResults, setSearchResults] = useState([]);
@@ -42,18 +42,21 @@ const SearchForm = () => {
       setPermissions(userPermissions.reduce((acc, perm) => ({ ...acc, [perm]: true }), {}));
 
       // Determine if user can assign teams (based on role only)
-      const hasTeamAssignRole = userData && 
+      const hasTeamAssignRole = userData &&
         ['super_admin', 'it_admin', 'business_head', 'team_leader'].includes(userData.role);
       setCanAssignTeam(hasTeamAssignRole);
-      
+
       // Determine if user can delete (based on role and permission)
-      setCanDeleteCustomers(hasTeamAssignRole && userPermissions.includes('delete_customer'));
+      // sub_dept_admin and dept_admin also get the delete button (approval flow handles enforcement)
+      const canDeleteRole = userData &&
+        ['super_admin', 'it_admin', 'business_head', 'team_leader', 'sub_dept_admin', 'admin'].includes(userData.role);
+      setCanDeleteCustomers(canDeleteRole && userPermissions.includes('delete_customer'));
 
       // Fetch available agents if user can assign teams
       if (hasTeamAssignRole) {
         const isAdmin = ['super_admin', 'it_admin', 'business_head'].includes(userData.role);
         let agentsEndpoint;
-        
+
         if (isAdmin) {
           agentsEndpoint = `${apiUrl}/users/all`;
         } else if (userData.role === 'team_leader') {
@@ -77,7 +80,7 @@ const SearchForm = () => {
 
           // Filter out admin users if current user is team leader
           if (userData.role === 'team_leader') {
-            agents = agents.filter(agent => 
+            agents = agents.filter(agent =>
               agent.role === 'user' && agent.team_id === userData.team_id
             );
           }
@@ -100,7 +103,7 @@ const SearchForm = () => {
       try {
         const query = new URLSearchParams(location.search);
         const searchQuery = query.get('query');
-        
+
         if (!searchQuery) {
           setSearchResults([]);
           setLoading(false);
@@ -109,10 +112,10 @@ const SearchForm = () => {
 
         const token = localStorage.getItem('token');
         const apiUrl = process.env.REACT_APP_API_URL;
-        
+
         // Build search URL based on user role
         let searchUrl = `${apiUrl}/customers/search?query=${searchQuery}`;
-        
+
         // Add role-specific parameters
         if (user && user.role === 'team_leader' && user.team_id) {
           searchUrl += `&team_id=${user.team_id}`;
@@ -137,7 +140,7 @@ const SearchForm = () => {
             results = [response.data];
           }
         }
-        
+
         console.log('Search results:', results); // Debug log
         setSearchResults(results);
         setLoading(false);
@@ -185,7 +188,7 @@ const SearchForm = () => {
     try {
       const token = localStorage.getItem('token');
       const apiUrl = process.env.REACT_APP_API_URL;
-      
+
       // Debug logs
       console.log('Selected Team User:', selectedTeamUser);
       console.log('Selected Records:', selectedRecords);
@@ -208,7 +211,7 @@ const SearchForm = () => {
         alert('Customers assigned successfully');
         setSelectedRecords([]);
         setSelectedTeamUser('');
-        
+
         // Refresh the search results
         const query = new URLSearchParams(location.search);
         const searchQuery = query.get('query');
@@ -234,7 +237,7 @@ const SearchForm = () => {
               results = [searchResponse.data];
             }
           }
-          
+
           console.log('Updated search results:', results); // Debug log
           setSearchResults(results);
         }
@@ -253,7 +256,7 @@ const SearchForm = () => {
       alert("You do not have permission to delete customers.");
       return;
     }
-    
+
     if (selectedRecords.length === 0) {
       alert("Please select customers to delete.");
       return;
@@ -261,13 +264,41 @@ const SearchForm = () => {
 
     const confirmDelete = window.confirm(`Are you sure you want to delete ${selectedRecords.length} selected customers?`);
     if (!confirmDelete) return;
-    
+
     try {
       const token = localStorage.getItem('token');
       const apiUrl = process.env.REACT_APP_API_URL;
       const customerIds = selectedRecords.map(c => c.id);
-      
-      await axios.post(`${apiUrl}/customers/delete-multiple`, 
+
+      // Check if current user needs approval before deleting
+      const meResponse = await axios.get(`${apiUrl}/current-user`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+      });
+      const me = meResponse.data;
+      const approvalRoles = ['team_leader', 'sub_dept_admin'];
+      const needsApproval = approvalRoles.includes(me.role) && me.requires_delete_approval;
+
+      if (needsApproval) {
+        let sent = 0;
+        for (const c of selectedRecords) {
+          try {
+            await axios.post(
+              `${apiUrl}/customers/${c.id}/request-delete`,
+              {},
+              { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+            );
+            sent++;
+          } catch (e) {
+            if (e.response?.status !== 409) console.error(`Failed to request delete for customer ${c.id}:`, e);
+          }
+        }
+        setSelectedRecords([]);
+        alert(`${sent} approval request(s) sent. You will be notified once reviewed.`);
+        return;
+      }
+
+      // Direct delete — no approval needed
+      await axios.post(`${apiUrl}/customers/delete-multiple`,
         { customerIds },
         {
           headers: {
@@ -280,7 +311,7 @@ const SearchForm = () => {
       // Remove deleted customers from state
       setSearchResults(prev => prev.filter(c => !customerIds.includes(c.id)));
       setSelectedRecords([]);
-      
+
       // Show success alert
       alert(`Successfully deleted ${customerIds.length} records!`);
     } catch (error) {
@@ -335,29 +366,30 @@ const SearchForm = () => {
           <table className="customers-table">
             <thead>
               <tr className="customer-row">
-                  {canAssignTeam && (
-                    <th>
-                      <input
-                        type="checkbox"
-                        checked={selectedRecords.length === currentRecords.length}
-                        onChange={handleSelectAll}
-                      />
-                    </th>
-                  )}
-                  <th>S.no.</th>
-                  <th>Unique Id</th>
-                  <th>Name</th>
-                  <th>Phone</th>
-                  <th>Email</th>
-                  <th>Lead Source</th>
-                  <th>Product</th>
-                  <th>Priority Level</th>
-                  <th>Conversion Status</th>
+                {canAssignTeam && (
+                  <th>
+                    <input
+                      type="checkbox"
+                      checked={selectedRecords.length === currentRecords.length}
+                      onChange={handleSelectAll}
+                    />
+                  </th>
+                )}
+                <th>S.no.</th>
+                <th>Unique Id</th>
+                <th>Name</th>
+                <th>Phone</th>
+                <th>Email</th>
+                <th>Lead Source</th>
+                <th>Product</th>
+                <th>Priority Level</th>
+                <th>Conversion Status</th>
+                <th>Last Updated</th>
               </tr>
             </thead>
             <tbody className="customer-body">
               {currentRecords.map((customer) => (
-                <tr 
+                <tr
                   key={customer.id}
                   onClick={(e) => {
                     if (e.target.type !== 'checkbox') {
@@ -383,7 +415,8 @@ const SearchForm = () => {
                   <td>{customer.lead_source}</td>
                   <td>{customer.product}</td>
                   <td>{customer.priority_level}</td>
-                  <td>{customer.conversion_status}</td> 
+                  <td>{customer.conversion_status}</td>
+                  <td>{customer.last_updated ? new Date(customer.last_updated).toLocaleString() : '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -395,11 +428,11 @@ const SearchForm = () => {
 
 
       {/* Controls section */}
-      {canAssignTeam && (
+      {(canAssignTeam || canDeleteCustomers) && (
         <div className="team-assignment-controls" style={{ marginTop: '0.5rem' }}>
-          {/* Only show delete button if user has delete permission */}
+          {/* Show delete button if user has delete permission — independent of canAssignTeam */}
           {canDeleteCustomers && (
-            <button 
+            <button
               onClick={handleDeleteSelected}
               className="delete-selected-btn"
               disabled={selectedRecords.length === 0}
@@ -407,27 +440,31 @@ const SearchForm = () => {
               Delete Selected
             </button>
           )}
-          
-          {/* Team assignment controls always visible if canAssignTeam */}
-          {/* <select 
-            value={selectedTeamUser}
-            onChange={(e) => setSelectedTeamUser(e.target.value)}
-            className="team-user-select"
-          >
-            <option value="">Select User</option>
-            {availableAgents.map(agent => (
-              <option key={agent.id} value={agent.id}>
-                {agent.username} {agent.role === 'user' ? '(Agent)' : `(${agent.role})`}
-              </option>
-            ))}
-          </select>
-          <button 
-            onClick={handleAssignTeam}
-            className="assign-team-btn"
-            disabled={!selectedTeamUser || selectedRecords.length === 0}
-          >
-            Assign to Selected User
-          </button> */}
+
+          {/* Team assignment controls — only for roles that can assign teams */}
+          {canAssignTeam && (
+            <>
+              <select
+                value={selectedTeamUser}
+                onChange={(e) => setSelectedTeamUser(e.target.value)}
+                className="team-user-select"
+              >
+                <option value="">Select User</option>
+                {availableAgents.map(agent => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.username} {agent.role === 'user' ? '(Agent)' : `(${agent.role})`}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleAssignTeam}
+                className="assign-team-btn"
+                disabled={!selectedTeamUser || selectedRecords.length === 0}
+              >
+                Assign to Selected User
+              </button>
+            </>
+          )}
         </div>
       )}
 
@@ -482,7 +519,7 @@ const SearchForm = () => {
           </div>
         </div>
       )}
-      
+
     </div>
   );
 };

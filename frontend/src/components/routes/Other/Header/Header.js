@@ -6,6 +6,7 @@ import axios from 'axios';
 import FileUpload from './Upload/FileUpload';
 import DownloadData from './Download/DownloadData';
 import { handleLogoutApi } from '../../../../utils/api';
+import { usePopup } from '../../../../context/PopupContext';
 import "./Header.css";
 
 const Header = () => {
@@ -15,7 +16,8 @@ const Header = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isAdmin, setIsAdmin] = useState(false);
     const [permissions, setPermissions] = useState({});
-    const navigate = useNavigate(); 
+    const navigate = useNavigate();
+    const { unreadCount } = usePopup();
 
     useEffect(() => {
         console.log('Current permissions state:', permissions);
@@ -37,28 +39,29 @@ const Header = () => {
 
             const apiUrl = process.env.REACT_APP_API_URL;
             const response = await axios.get(`${apiUrl}/current-user`, {
-                headers: { 
+                headers: {
                     Authorization: `Bearer ${token}`,
                     "Content-Type": "application/json",
                 },
             });
-            
+
             // The actual user data is in response.data
             const userData = response.data;
             console.log('API user data:', userData);
-            
+
             // Set username from userData
             setUsername(userData.username || '');
-            
+
             // Get role directly from userData
             const role = userData.role;
             console.log('Role from API:', role);
-            
+
             // Set admin status based on role
             const isAdminRole = role === 'super_admin' || role === 'it_admin' || role === 'business_head';
-            console.log('Is admin role?', isAdminRole);
-            
-            setIsAdmin(isAdminRole);
+            const isDeptAdmin = role === 'admin';
+            console.log('Is admin role?', isAdminRole, 'Is dept admin?', isDeptAdmin);
+
+            setIsAdmin(isAdminRole || isDeptAdmin);
             setUserRole(role);
 
             // For admin roles, set all permissions to true regardless of permissions array
@@ -114,7 +117,7 @@ const Header = () => {
 
     const handleSearch = () => {
         if (!searchQuery.trim()) {
-            alert("Please enter a search term."); 
+            alert("Please enter a search term.");
             return;
         }
 
@@ -154,7 +157,7 @@ const Header = () => {
         <div className="header-container">
             {isLoggedIn ? (
                 <Link to="/customers" className="logo-link">
-                    <img 
+                    <img
                         src="/uploads/logo.webp"
                         className="logo"
                         alt="Company Logo"
@@ -162,7 +165,7 @@ const Header = () => {
                     />
                 </Link>
             ) : (
-                <img 
+                <img
                     src="/uploads/logo.webp"
                     className="logo"
                     alt="Company Logo"
@@ -173,28 +176,28 @@ const Header = () => {
                 {isLoggedIn ? (
                     <>
                         {/* Only show search if user has view permissions */}
-                        {(userRole === 'super_admin' || userRole === 'it_admin' || 
-                          (permissions && (permissions.view_customer || permissions.view_team_customers || permissions.view_assigned_customers))) && (
-                            <div className="header-search">
-                                <input
-                                    type="text"
-                                    className="form-control form-cont"
-                                    aria-label="Search input"
-                                    placeholder="Search"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    onKeyDown={handleKeyDown}
-                                />
-                                <img 
-                                    src="/uploads/search.svg"
-                                    className="srch-icon"
-                                    alt="search-icon"
-                                    onClick={handleSearch}
-                                    style={{ cursor: 'pointer' }}
-                                />
-                            </div>
-                        )}
-                        
+                        {(userRole === 'super_admin' || userRole === 'it_admin' ||
+                            (permissions && (permissions.view_customer || permissions.view_team_customers || permissions.view_assigned_customers))) && (
+                                <div className="header-search">
+                                    <input
+                                        type="text"
+                                        className="form-control form-cont"
+                                        aria-label="Search input"
+                                        placeholder="Search"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        onKeyDown={handleKeyDown}
+                                    />
+                                    <img
+                                        src="/uploads/search.svg"
+                                        className="srch-icon"
+                                        alt="search-icon"
+                                        onClick={handleSearch}
+                                        style={{ cursor: 'pointer' }}
+                                    />
+                                </div>
+                            )}
+
                         {/* Upload button */}
                         {permissions.upload_document && (
                             <div className="file-upload-section">
@@ -205,26 +208,61 @@ const Header = () => {
                         {/* Download button */}
                         {permissions.download_data && (
                             <div className="download-section">
-                                <DownloadData /> 
+                                <DownloadData />
                             </div>
                         )}
 
                         {/* Only show notification bell if user has view permissions */}
-                        {(userRole === 'super_admin' || userRole === 'it_admin' || 
-                          (permissions && (permissions.view_customer || permissions.view_team_customers || permissions.view_assigned_customers))) && (
-                            <div className="notification-section">
-                                <img 
-                                    src="/uploads/bell.svg"
-                                    className="notification-icon"
-                                    alt="notification icon"
-                                    aria-label="Notification"
-                                    onClick={handleReminderClick}
-                                    style={{ cursor: 'pointer' }}
-                                />  
-                            </div>
+                        {(userRole === 'super_admin' || userRole === 'it_admin' ||
+                            (permissions && (permissions.view_customer || permissions.view_team_customers || permissions.view_assigned_customers))) && (
+                                <div className="notification-section" style={{ position: 'relative', display: 'inline-block' }}>
+                                    <img
+                                        src="/uploads/bell.svg"
+                                        className="notification-icon"
+                                        alt="notification icon"
+                                        aria-label="Notification"
+                                        onClick={() => navigate('/notifications')}
+                                        style={{ cursor: 'pointer' }}
+                                    />
+                                    {unreadCount > 0 && (
+                                        <span className="notif-badge" style={{
+                                            position: 'absolute',
+                                            top: '-6px',
+                                            right: '-6px',
+                                            background: '#d32f2f',
+                                            color: 'white',
+                                            borderRadius: '50%',
+                                            width: '18px',
+                                            height: '18px',
+                                            fontSize: '11px',
+                                            fontWeight: 'bold',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            pointerEvents: 'none',
+                                            lineHeight: 1
+                                        }}>
+                                            {unreadCount > 9 ? '9+' : unreadCount}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                        {/* Admin Portal link for IT Admin (business_head) ONLY */}
+                        {(userRole === 'business_head') && (
+                            <Link to="/admin" style={{ fontSize: '0.85rem', color: '#EF6F53', fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                                IT Admin Portal
+                            </Link>
                         )}
+
+                        {/* Dept Admin Portal link for admin role */}
+                        {userRole === 'admin' && (
+                            <Link to="/dept-admin" style={{ fontSize: '0.85rem', color: '#2196f3', fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                                Dept Portal
+                            </Link>
+                        )}
+
                         <div className="profile-section">
-                            <img 
+                            <img
                                 src="/uploads/fundfloat.webp"
                                 className="pro-icon"
                                 alt="profile icon"
@@ -233,7 +271,7 @@ const Header = () => {
                             />
                             <span onClick={handleLogout} style={{ cursor: 'pointer', fontSize: '0.85rem', color: '#666' }}>Logout</span>
                             {!isLoading && username && (
-                                <span style={{ fontSize: '0.85rem', color: '#666', marginTop: '-2.5px'  }}>
+                                <span style={{ fontSize: '0.85rem', color: '#666', marginTop: '-2.5px' }}>
                                     {username}
                                 </span>
                             )}
@@ -241,7 +279,7 @@ const Header = () => {
                     </>
                 ) : (
                     <Link to="/login">
-                        <img 
+                        <img
                             src="/uploads/profile.svg"
                             className="pro-icon"
                             alt="profile icon"

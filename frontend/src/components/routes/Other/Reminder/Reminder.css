@@ -22,8 +22,6 @@
     box-sizing: border-box;
     text-align: left;
     transition: all 0.3s ease-in-out;
-    overflow-y: auto;
-    height: 70vh;
 }
 
 .reminders-list {
@@ -62,11 +60,13 @@
     border-left: 5px solid #4caf50;
 }
 
-.customer-info, .time-info {
+.customer-info,
+.time-info {
     flex: 1;
 }
 
-.customer-info p, .time-info p {
+.customer-info p,
+.time-info p {
     margin: 5px 0;
     font-size: 14px;
 }
@@ -79,50 +79,6 @@
     border-radius: 4px;
     margin: 20px;
 }
-
-/* .reminders-table {
-    width: 40%;
-    border-collapse: collapse;
-    background-color: white;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    margin: auto;
-    overflow-y: auto;
-    height: 40vh;
-    border-radius: 8px;
-}
-
-.reminders-table th, .reminders-table td {
-    padding: 0.5rem;
-    text-align: left;
-}
-
-.reminders-table th {
-    background-color: #364C63;
-    color: white;
-    font-weight: bold;
-    font-size: 0.85rem;
-    border-bottom: 2px solid #EF6F53;
-}
-
-.reminders-table td {
-    border-bottom: 1px solid #ddd;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: #364C63;
-}
-
-.reminders-table tr {
-    transition: background-color 0.2s ease;
-}
-
-.reminders-table tr:hover {
-    background-color: #f5f5f5;
-    cursor: pointer;
-}
-
-.reminders-table tr:nth-child(even) {
-    background-color: #f9f9f9;
-} */
 
 .priority-badge {
     padding: 4px 8px;
@@ -147,6 +103,131 @@
     color: white;
 }
 
+/* ── NOTIFICATION HISTORY ── */
+.notification-history-section {
+    padding: 0 1.5rem 6rem 1.5rem;
+    /* Large bottom padding to clear floating buttons */
+    max-width: 1100px;
+    margin: 2rem auto 0 auto;
+}
+
+.history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.8rem;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.mark-read-btn {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+    color: #4a5568;
+    font-weight: 600;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.mark-read-btn:hover {
+    background: #f7fafc;
+    border-color: #cbd5e0;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.notification-cards-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.notification-card-item {
+    background: #fff;
+    border: 1px solid #edf2f7;
+    border-radius: 12px;
+    padding: 1.25rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.notification-card-item:hover {
+    transform: translateX(4px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+    border-color: #e2e8f0;
+}
+
+.notification-card-item.approved {
+    border-left: 6px solid #48bb78;
+}
+
+.notification-card-item.rejected {
+    border-left: 6px solid #f56565;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+    width: 100%;
+}
+
+.card-title {
+    margin: 0;
+    font-weight: 800;
+    font-size: 1.05rem;
+    color: #1a202c;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.card-time {
+    font-size: 0.75rem;
+    color: #718096;
+    font-weight: 600;
+    background: #f7fafc;
+    padding: 0.25rem 0.6rem;
+    border-radius: 20px;
+    white-space: nowrap;
+}
+
+.card-body {
+    padding-left: 0.5rem;
+}
+
+.card-message {
+    margin: 0;
+    font-size: 0.92rem;
+    color: #4a5568;
+    line-height: 1.6;
+}
+
+.empty-history {
+    padding: 4rem 2rem;
+    text-align: center;
+    background: #fcfcfc;
+    border: 2px dashed #edf2f7;
+    border-radius: 16px;
+    color: #a0aec0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+.empty-history svg {
+    font-size: 2.5rem;
+    color: #cbd5e0;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
     .reminder-item {
@@ -154,7 +235,8 @@
         gap: 10px;
     }
 
-    .customer-info, .time-info {
+    .customer-info,
+    .time-info {
         width: 100%;
     }
 }

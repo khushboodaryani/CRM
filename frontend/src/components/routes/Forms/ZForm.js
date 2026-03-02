@@ -7,7 +7,6 @@ import UseForm from "./UseForm/UseForm";
 import ListForm from "./ListForm/ListForm";
 import LastChanges from "./LastChange/LastChange";
 import Login from "../Sign/Login/Login";
-import Register from "../Sign/Register/Register";
 import Logout from "../Sign/Logout/Logout";
 import CreateForm from "./CreateForm/CreateForm";
 import UploadNew from "../Other/Header/Upload/UploadNew";
@@ -17,23 +16,34 @@ import ResetPassword from "../Sign/ResetPassword/ResetPassword";
 import DownloadFile from "../Other/Header/Download/DownloadFile";
 import ApproveUser from "../Sign/ApproveUser/ApproveUser";
 import AdminPortal from "./AdminPortal/AdminPortal";
+import DeptAdminPortal from "./AdminPortal/DeptAdminPortal";
 import AdminGuard from "../../guards/AdminGuard";
+import DeptAdminGuard from "../../guards/DeptAdminGuard";
 import RequireAuth from '../../guards/RequireAuth';
 import SuperAdminDashboard from '../../SuperAdmin/Dashboard';
+import SuperLeadsPortal from '../../SuperAdmin/SuperLeadsPortal';
 import FormCreation from "./FormCreation/FormCreation";
+import DistributionSettings from "../../Settings/DistributionSettings";
 
 const ZForm = () => {
     return (
         <Routes>
 
-            {/* Super Admin Dashboard */}
+            {/* Super Admin Management */}
             <Route path="/super-admin/dashboard" element={<SuperAdminDashboard />} />
+            <Route path="/super-admin/leads" element={<SuperLeadsPortal />} />
 
-            {/* Admin Portal - Protected by AdminGuard */}
+            {/* Admin Portal - Protected by AdminGuard (business_head / IT Admin) */}
             <Route path="/admin" element={<AdminGuard><AdminPortal /></AdminGuard>} />
+
+            {/* Dept Admin Portal - Protected by DeptAdminGuard (admin role) */}
+            <Route path="/dept-admin" element={<DeptAdminGuard><DeptAdminPortal /></DeptAdminGuard>} />
 
             {/* Dynamic Form Creation - Business Heads only */}
             <Route path="/form-creation" element={<AdminGuard><FormCreation /></AdminGuard>} />
+
+            {/* Lead Distribution Settings */}
+            <Route path="/distribution-rules" element={<DeptAdminGuard><DistributionSettings /></DeptAdminGuard>} />
 
             {/* List all customers */}
             <Route path="/customers" element={<ListForm />} />
@@ -77,8 +87,9 @@ const ZForm = () => {
                 }
             />
 
-            {/* Access call reminders */}
+            {/* Access call reminders and delete notifications */}
             <Route path="/customers/reminders" element={<Reminder />} />
+            <Route path="/notifications" element={<Reminder />} />
 
 
             {/* Register a new user
