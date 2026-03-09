@@ -65,7 +65,9 @@ CREATE TABLE IF NOT EXISTS roles (
         'team_leader',
         'user',
         'mis',
-        'admin'
+        'admin',
+        'dept_admin',
+        'sub_dept_admin'
     ) NOT NULL UNIQUE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -202,6 +204,9 @@ CREATE TABLE IF NOT EXISTS customers (
     phone_no          VARCHAR(50)  NOT NULL,
     agent_name        VARCHAR(100) NOT NULL,
 
+    -- Team assignment
+    team_id           INT NULL COMMENT 'team assigned to this lead',
+
     -- Department scoping (v2)
     department_id     INT NULL,
     sub_department_id INT NULL,
@@ -282,7 +287,9 @@ INSERT INTO roles (role_name) VALUES
     ('team_leader'),
     ('user'),
     ('mis'),
-    ('admin');
+    ('admin'),
+    ('dept_admin'),
+    ('sub_dept_admin');
 
 -- Permissions
 INSERT INTO permissions (permission_name, description) VALUES

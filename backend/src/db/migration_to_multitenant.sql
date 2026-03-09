@@ -1,3 +1,4 @@
+
 -- Migration Script: Convert existing single-tenant data to multi-tenant
 -- Run this AFTER creating the new schema_multitenant.sql
 

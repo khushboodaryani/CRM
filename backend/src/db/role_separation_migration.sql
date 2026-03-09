@@ -2,7 +2,7 @@
 
 USE knowledgeBase_multitenant;
 
--- 1. Add new roles if they don't exist
+-- 1. Ensure dept_admin and sub_dept_admin roles exist (safe to re-run)
 INSERT IGNORE INTO roles (role_name) VALUES ('dept_admin'), ('sub_dept_admin');
 
 -- 2. Migrate existing 'admin' users to 'dept_admin'
