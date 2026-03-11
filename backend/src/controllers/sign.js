@@ -68,14 +68,14 @@ export const registerCustomer = async (req, res) => {
             const mailOptions = {
                 from: process.env.EMAIL_USER,
                 to: email,
-                subject: 'Welcome to FundFloat',
+                subject: 'Welcome to Multycomm CRM',
                 html: `
                     <h2>Welcome ${username}!</h2>
                     <p>Your account has been created successfully.</p>
                     <p>You can now login to your account using your email and the default password: <strong>12345678</strong></p>
                     <p>Please change your password after your first login.</p>
                     <a href="${process.env.FRONTEND_URL}/login" style="display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">Login Now</a>
-                    <p>Best regards,<br>FundFloat Team</p>
+                    <p>Best regards,<br>Multycomm Team</p>
                 `
             };
 
@@ -564,7 +564,7 @@ export const sendOTP = async (req, res) => {
         const mailOptions = {
             from: process.env.EMAIL_USER,
             to: email,
-            subject: 'Password Reset Request - FundFloat',
+            subject: 'Password Reset Request - Multycomm CRM',
             html: `
                 <h2>Password Reset Request</h2>
                 <p>Dear ${user.username},</p>
@@ -577,7 +577,7 @@ export const sendOTP = async (req, res) => {
                 <a href="${resetLink}" style="display: inline-block; padding: 10px 20px; background-color: #EF6F53; color: white; text-decoration: none; border-radius: 5px;">Reset Password</a>
                
                 <p>If you didn't request this password reset, please ignore this email or contact support if you have concerns.</p>
-                <p>Best regards,<br>FundFloat Team</p>
+                <p>Best regards,<br>Multycomm Team</p>
             `
         };
 

@@ -150,7 +150,9 @@ export const createCompany = async (req, res) => {
                 <p><strong>Company Details:</strong></p>
                 <ul>
                     <li>Company Name: ${company_name}</li>
-                    <li>License Limit: ${license_limit} users</li>
+                    <li>Total License Limit: ${effectiveTotal} users</li>
+                    <li>Admin Licenses: ${effectiveAdminLimit}</li>
+                    <li>User Licenses: ${effectiveUserLimit}</li>
                 </ul>
                 <p><strong>Your Login Credentials:</strong></p>
                 <ul>

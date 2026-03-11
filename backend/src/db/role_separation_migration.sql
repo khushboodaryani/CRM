@@ -14,7 +14,7 @@ SET @dept_admin_role_id = (SELECT id FROM roles WHERE role_name = 'dept_admin');
 UPDATE users SET role_id = @dept_admin_role_id WHERE role_id = @admin_role_id;
 
 -- 3. Update customers table for scheduled_at
-ALTER TABLE customers ADD COLUMN IF NOT EXISTS scheduled_at DATETIME NULL;
+ALTER TABLE customers ADD COLUMN scheduled_at DATETIME NULL;
 
 -- 4. Ensure admin_departments can handle the new roles effectively
 -- No schema change needed there as it already uses user_id

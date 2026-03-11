@@ -12,8 +12,13 @@
 import bcrypt from 'bcrypt';
 import connectDB from '../../db/index.js';
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-dotenv.config({ path: '../../../.env' });
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+dotenv.config({ path: join(__dirname, '../../../.env') });
 
 const createSuperAdmin = async () => {
     // ── Super Admin credentials ──────────────────────────────────────────────

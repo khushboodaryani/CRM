@@ -206,35 +206,47 @@ export const createUser = async (req, res) => {
                 }
             }
 
-            // Send welcome email
-            const transporter = nodemailer.createTransport({
-                service: 'gmail',
-                auth: {
-                    user: process.env.EMAIL_USER,
-                    pass: process.env.EMAIL_PASSWORD
-                }
-            });
-
-            const mailOptions = {
-                from: process.env.EMAIL_USER,
-                to: email,
-                subject: 'Welcome to Multycomm',
-                html: `
-                    <h2>Welcome ${username}!</h2>
-                    <p>Your account has been created successfully.</p>
-                    <p>You can now login to your account using your email and the default password: <strong>12345678</strong></p>
-                    <p>Please change your password after your first login.</p>
-                    <a href="${process.env.FRONTEND_URL}/login" style="display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">Login Now</a>
-                    <p>Best regards,<br>Multycomm Team</p>
-                `
-            };
-
-            await transporter.sendMail(mailOptions);
+            // Commit the transaction first to ensure user is created
             await conn.commit();
 
+            // Send welcome email (non-blocking - don't fail user creation if email fails)
+            let emailSent = false;
+            try {
+                const transporter = nodemailer.createTransport({
+                    service: 'gmail',
+                    auth: {
+                        user: process.env.EMAIL_USER,
+                        pass: process.env.EMAIL_PASSWORD
+                    }
+                });
+
+                const mailOptions = {
+                    from: process.env.EMAIL_USER,
+                    to: email,
+                    subject: 'Welcome to Multycomm',
+                    html: `
+                        <h2>Welcome ${username}!</h2>
+                        <p>Your account has been created successfully.</p>
+                        <p>You can now login to your account using your email and the default password: <strong>12345678</strong></p>
+                        <p>Please change your password after your first login.</p>
+                        <a href="${process.env.FRONTEND_URL}/login" style="display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">Login Now</a>
+                        <p>Best regards,<br>Multycomm Team</p>
+                    `
+                };
+
+                await transporter.sendMail(mailOptions);
+                emailSent = true;
+                console.log(`Welcome email sent successfully to ${email}`);
+            } catch (emailError) {
+                console.error('Failed to send welcome email:', emailError.message);
+            }
+
             res.status(201).json({
-                message: 'User created successfully. Welcome email has been sent.',
-                user_id: newUserId
+                message: emailSent 
+                    ? 'User created successfully. Welcome email has been sent.'
+                    : 'User created successfully. However, welcome email could not be sent.',
+                user_id: newUserId,
+                email_sent: emailSent
             });
 
         } catch (error) {
